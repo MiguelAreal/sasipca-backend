@@ -1,0 +1,250 @@
+﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using sasipca_API.Models;
+using sasipca_API.Services;
+using sasipca_API.Services.Interfaces;
+using Microsoft.AspNetCore.Authorization;
+using sasipca_API.Data;
+using sasipca_API.Dtos;
+using sasipca_API.Dtos.sasipca_API.Dtos;
+using sasipca_API.DBModels;
+using Humanizer;
+
+namespace sasipca_API.Controllers
+{
+    /// <summary>
+    /// Controller para gestão de beneficiários.
+    /// </summary>
+    [Route("api/beneficiario")]
+    [ApiController]
+    [Authorize]
+    public class BeneficiaryController : ControllerBase
+    {
+        private readonly SasipcaContext _dbContext;
+        private readonly IAuthService _authService;
+        private readonly IJWTService _jwtService;
+
+        /// <summary>
+        /// Inicialização do BeneficiaryController
+        /// </summary>
+        /// <param name="authService">Serviço de autenticação</param>
+        /// <param name="jwtService">Serviço JWT</param>
+        /// <param name="context">Contexto da base de dados</param>
+        public BeneficiaryController(IAuthService authService, IJWTService jwtService, SasipcaContext context)
+        {
+            _dbContext = context;
+            _authService = authService;
+            _jwtService = jwtService;
+        }
+
+        /// <summary>
+        /// Registo de novo perfil de beneficiário.
+        /// </summary>
+        /// <remarks>
+        /// Cria um novo perfil de beneficiário após validar:
+        /// - E-mail único
+        /// - Contacto único
+        /// </remarks>
+        /// <param name="beneficiaryPostDto">Dados do novo beneficiário</param>
+        /// <returns>Resultado da operação</returns>
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(Resposta))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(Resposta))]
+        [Produces("application/json")]
+        [HttpPost()]
+        [AllowAnonymous]
+        public async Task<IActionResult> RegistarBeneficiario([FromBody] BeneficiaryPostDTO beneficiaryPostDto)
+        {
+            try
+            {
+                //Busca id do user a efetuar o registo.
+                int userId = (int)HttpContext.Items["UserId"];
+
+                if (await _dbContext.Users.AnyAsync(p => p.Email == beneficiaryPostDto.Email))
+                    return BadRequest(new Resposta("Este e-mail já está registado."));
+
+                if (await _dbContext.Users.AnyAsync(p => p.Contact == beneficiaryPostDto.Contact))
+                    return BadRequest(new Resposta("Este contacto já está registado."));
+
+                // Use the main context for adding the new user and address
+                var beneficiary = new Beneficiary
+                {
+                    Name = beneficiaryPostDto.Name,
+                    Email = beneficiaryPostDto.Email,
+                    Contact = beneficiaryPostDto.Contact,
+                    Course = beneficiaryPostDto.Course,
+                    CurricularYear = beneficiaryPostDto.CurricularYear,
+                    GlobalObs = beneficiaryPostDto.GlobalObs,
+                    CreatedBy = userId,
+                    Address = new BeneficiaryAddress
+                    {
+                        Street = beneficiaryPostDto.Street,
+                        PostalCode = beneficiaryPostDto.PostalCode,
+                        Number = beneficiaryPostDto.Number
+                    }
+                };
+
+
+                await _dbContext.Beneficiaries.AddAsync(beneficiary);
+                await _dbContext.SaveChangesAsync();
+
+                return Ok(new Resposta("Perfil criado com sucesso."));
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new Resposta("Erro ao criar perfil. Tente novamente. " + ex.Message));
+            }
+        }
+
+
+        /// <summary>
+        /// Atualizar perfil de beneficiário.
+        /// </summary>
+        /// <remarks>
+        /// Atualiza os dados de perfil de beneficiário existente,
+        /// incluindo informações de morada.
+        /// </remarks>
+        /// <param name="beneficiaryId">ID do beneficiário a atualizar</param>
+        /// <param name="beneficiaryPutDto">Novos dados para o beneficiário</param>
+        /// <returns>Resultado da operação</returns>
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(Resposta))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(Resposta))]
+        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(Resposta))]
+        [Produces("application/json")]
+        [HttpPut("{beneficiaryId}")]
+        public async Task<IActionResult> AtualizarBeneficiario(int beneficiaryId, [FromBody] BeneficiaryPutDTO beneficiaryPutDto)
+        {
+            try
+            {
+                int userId = (int)HttpContext.Items["UserId"];
+
+                // Buscar beneficiário existente
+                var beneficiary = await _dbContext.Beneficiaries
+                    .Include(b => b.Address)
+                    .Include(b => b.ParticularObs)
+                    .FirstOrDefaultAsync(b => b.Id == beneficiaryId);
+
+                if (beneficiary == null)
+                    return NotFound(new Resposta("Beneficiário não encontrado."));
+
+                // Verificar duplicações de e-mail e contacto (mas ignorar o próprio beneficiário)
+                if (await _dbContext.Beneficiaries.AnyAsync(p => p.Email == beneficiaryPutDto.Email && p.Id != beneficiaryId))
+                    return BadRequest(new Resposta("Este e-mail já está registado."));
+
+                if (await _dbContext.Beneficiaries.AnyAsync(p => p.Contact == beneficiaryPutDto.Contact && p.Id != beneficiaryId))
+                    return BadRequest(new Resposta("Este contacto já está registado."));
+
+                // Atualizar os campos principais
+                beneficiary.Name = beneficiaryPutDto.Name;
+                beneficiary.Email = beneficiaryPutDto.Email;
+                beneficiary.Contact = beneficiaryPutDto.Contact;
+                beneficiary.Course = beneficiaryPutDto.Course;
+                beneficiary.CurricularYear = beneficiaryPutDto.CurricularYear;
+                beneficiary.GlobalObs = beneficiaryPutDto.GlobalObs;
+
+                // Atualizar ou criar morada
+                if (beneficiary.Address == null)
+                {
+                    beneficiary.Address = new BeneficiaryAddress
+                    {
+                        Street = beneficiaryPutDto.Street,
+                        Number = beneficiaryPutDto.Number,
+                        PostalCode = beneficiaryPutDto.PostalCode
+                    };
+                }
+                else
+                {
+                    beneficiary.Address.Street = beneficiaryPutDto.Street;
+                    beneficiary.Address.Number = beneficiaryPutDto.Number;
+                    beneficiary.Address.PostalCode = beneficiaryPutDto.PostalCode;
+                }
+
+                // Faz o upsert da observação particular
+                if (!string.IsNullOrWhiteSpace(beneficiaryPutDto.ParticularObs))
+                {
+                    var obs = beneficiary.ParticularObs
+                        .FirstOrDefault(o => o.UserId == userId);
+
+                    if (obs != null)
+                    {
+                        obs.Obs = beneficiaryPutDto.ParticularObs;
+                    }
+                    else
+                    {
+                        beneficiary.ParticularObs.Add(new ParticularOb
+                        {
+                            UserId = userId,
+                            BeneficiaryId = beneficiaryId,
+                            Obs = beneficiaryPutDto.ParticularObs
+                        });
+                    }
+                }
+
+                await _dbContext.SaveChangesAsync();
+
+                return Ok(new Resposta("Perfil atualizado com sucesso."));
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new Resposta($"Erro ao atualizar perfil: {ex.Message}"));
+            }
+        }
+
+
+        /// <summary>
+        /// Busca um beneficiário específico.
+        /// </summary>
+        /// <remarks>
+        /// Apenas é possível consultar beneficiários que partilhem o mesmo código postal.
+        /// </remarks>
+        /// <param name="beneficiaryId">ID do beneficiário a consultar</param>
+        /// <returns>Lista de beneficiários ou detalhes de um beneficiário</returns>
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<BeneficiaryGetDTO>))]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(BeneficiaryGetDTO))]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized, Type = typeof(Resposta))]
+        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(Resposta))]
+        [Produces("application/json")]
+        [HttpGet("{beneficiaryId}")]
+        public async Task<ActionResult<Resposta>> BuscarPerfil(int beneficiaryId)
+        {
+            try
+            {
+                var userId = (int)HttpContext.Items["UserId"];
+
+                var beneficiary = await _dbContext.Beneficiaries
+                    .Where(p => p.Id == beneficiaryId)
+                    .Select(p => new BeneficiaryGetDTO
+                    {
+                       Id = p.Id,
+                       Name = p.Name,
+                       Email = p.Email,
+                       Contact = p.Contact,
+                       Course = p.Course,
+                       CurricularYear = p.CurricularYear,
+                    })
+                        .FirstOrDefaultAsync();
+
+                    if (beneficiary == null)
+                        return NotFound(new Resposta("Perfil não encontrado."));
+
+                return Ok(beneficiary);
+                
+            }
+            catch (Exception)
+            {
+                return BadRequest(new Resposta("Ocorreu um erro ao obter o perfil."));
+            }
+        }
+
+
+
+
+        #region Métodos Auxiliares Privados
+
+      
+
+        #endregion
+    }
+}

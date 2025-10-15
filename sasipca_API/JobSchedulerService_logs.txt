@@ -1,0 +1,42 @@
+Evento 4 agendado para atualização na data 23/03/2025 22:06:03.
+[23/03/2025 22:06:12] Evento 4 - 'Teste HangFire' não cumpre requisitos. Estado alterado para 'Não Cumpre Requisitos'.
+Evento 5 agendado para atualização na data 27/03/2025 23:33:49.
+Evento 6 agendado para atualização na data 27/03/2025 22:36:49.
+[27/03/2025 22:36:52] Evento 6 - 'EVENTO AREAL' não cumpre requisitos. Estado alterado para 'Não Cumpre Requisitos'.
+[27/03/2025 23:34:03] Evento 5 - 'EVENTO AREAL' não cumpre requisitos. Estado alterado para 'Não Cumpre Requisitos'.
+Serviço 3 agendado para atualização na data 17/04/2025 14:45:00.
+Serviço 4 agendado para atualização na data 10/04/2025 15:20:00.
+Serviço 4 agendado para término na data 10/04/2025 17:20:00.
+[10/04/2025 18:20:26] Serviço 4 - 'Cortar relva' foi concluído. Estado alterado para 'Terminado'.
+[10/04/2025 19:30:02] Serviço 5 - 'Cortar relva' não cumpre requisitos. Estado alterado para 'Não Cumpre Requisitos'.
+
+[12/04/2025 23:20:37] Serviço 6 agendado para atualização na data 13/04/2025 19:20:00.
+[12/04/2025 23:20:37] Serviço 6 agendado para término na data 13/04/2025 22:20:00.
+[13/04/2025 00:21:59] Serviço 7 agendado para atualização na data 14/04/2025 00:00:00.
+[13/04/2025 00:23:33] Serviço 8 agendado para atualização na data 14/04/2025 02:20:00.
+[13/04/2025 00:24:26] Serviço 9 agendado para atualização na data 14/04/2025 00:00:00.
+[13/04/2025 20:26:24] Serviço 10 agendado para atualização na data 14/04/2025 20:26:20.
+[13/04/2025 21:33:08] Serviço 11 agendado para atualização na data 18/04/2025 08:30:00.
+[14/04/2025 12:52:08] Evento 7 agendado para atualização na data 14/04/2025 14:50:00.
+[14/04/2025 12:56:51] Evento 8 agendado para atualização na data 15/04/2025 16:56:00.
+[14/04/2025 15:03:15] Evento 11 agendado para atualização na data 15/04/2025 19:00:00.
+[14/04/2025 20:26:28] Serviço 10 - 'teste' não cumpre requisitos. Estado alterado para 'Não Cumpre Requisitos'.
+[15/04/2025 16:22:41] Evento 12 agendado para atualização na data 18/04/2025 19:00:00.
+[15/04/2025 19:00:01] Evento 11 - 'teste evento' não cumpre requisitos. Estado alterado para 'Não Cumpre Requisitos'.
+[15/04/2025 22:32:49] Evento 13 agendado para atualização na data 15/04/2025 22:40:00.
+[17/04/2025 13:59:18] Serviço 12 agendado para atualização na data 18/04/2025 14:00:00.
+[17/04/2025 20:30:07] Serviço 5 - 'Cortar relva' foi concluído. Estado alterado para 'Terminado'.
+[17/04/2025 23:47:17] Evento 14 agendado para atualização na data 18/04/2025 01:50:00.
+[17/04/2025 23:58:52] Evento 15 agendado para atualização na data 18/04/2025 20:00:00.
+[18/04/2025 00:43:30] Serviço 13 agendado para atualização na data 18/04/2025 01:20:00.
+[18/04/2025 00:59:38] Serviço 14 agendado para atualização na data 18/04/2025 01:03:00.
+[18/04/2025 01:01:01] Serviço 15 agendado para atualização na data 18/04/2025 01:04:00.
+[18/04/2025 01:03:11] [18/04/2025 01:03:11] Serviço 14 - 'teste' não cumpre requisitos. Estado alterado para 'Não Cumpre Requisitos'.
+[30/04/2025 09:55:03] [30/04/2025 09:55:03] Serviço 24 - 'Serviço de Teste' não cumpre requisitos. Estado alterado para 'Não Cumpre Requisitos'.
+[30/04/2025 11:53:12] Serviço 26 agendado para atualização na data 30/04/2025 16:58:00.
+[30/04/2025 11:53:12] Serviço 26 agendado para término na data 30/04/2025 17:59:00.
+[30/04/2025 16:28:04] Serviço 29 agendado para atualização na data 30/04/2025 15:35:39.
+[30/04/2025 16:28:05] Serviço 29 agendado para término na data 30/04/2025 15:40:39.
+[30/04/2025 16:31:17] Serviço 30 agendado para atualização na data 30/04/2025 17:30:00.
+[30/04/2025 16:31:18] Serviço 30 agendado para término na data 30/04/2025 17:32:00.
+[30/04/2025 16:38:15] Evento 20 agendado para atualização na data 30/04/2025 16:40:00.
