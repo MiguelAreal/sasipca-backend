@@ -27,12 +27,17 @@ namespace sasipca_API.Dtos
         /// <summary>
         /// Objeto que contém o identificador e nome da categoria do produto.
         /// </summary>
-        public CategoryType Category { get; set; } = null!;
+        public string Category { get; set; } = null!;
 
         /// <summary>
         /// Objeto que contém o identificador e nome da categoria do produto.
         /// </summary>
-        public UnitType Unit { get; set; } = null!;
+        public string Unit { get; set; } = null!;
+
+        /// <summary>
+        /// Lista dos lotes associados ao produto.
+        /// </summary>
+        public ICollection<ProductLotDTO> ProductLots { get; set; } = new List<ProductLotDTO>();
 
     }
 }

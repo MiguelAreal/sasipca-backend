@@ -54,11 +54,11 @@ namespace sasipca_API.Dtos
 }
 
 // Classe para a resposta paginada
-public class PaginatedResponse<T>
+/*public class PaginatedResponse<T>
 {
     public IEnumerable<T> Data { get; set; }
     public int PageNumber { get; set; }
     public int PageSize { get; set; }
     public int TotalCount { get; set; }
     public int TotalPages { get; set; }
-}
+}*/

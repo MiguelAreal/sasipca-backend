@@ -53,7 +53,7 @@ namespace sasipca_API.Controllers
         /// <param name="searchTerm">Termo para busca por nome</param>
         /// <param name="userId">Filtro por criador do anúncio.</param>
         /// <returns>Lista paginada de anúncios</returns>
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PaginatedResponse<AnuncioListaDTO>))]
+        /*[ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PaginatedResponse<AnuncioListaDTO>))]
         [ProducesResponseType(StatusCodes.Status401Unauthorized, Type = typeof(Response))]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(Response))]
         [Produces("application/json")]
@@ -114,7 +114,7 @@ namespace sasipca_API.Controllers
             {
                 return BadRequest(new Resposta("Ocorreu um erro ao obter os anúncios."));
             }
-        }
+        }*/
 
 
     }

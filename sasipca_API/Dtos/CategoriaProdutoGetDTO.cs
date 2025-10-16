@@ -9,11 +9,11 @@
         /// <summary>
         /// Identificador da categoria do produto.
         /// </summary>
-        public int IdCategoria { get; set; }
+        public int Id { get; set; }
 
         /// <summary>
         /// Nome da categoria do produto.
         /// </summary>
-        public string Nome { get; set; } = null!;
+        public string Type { get; set; } = null!;
     }
 }

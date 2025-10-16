@@ -79,7 +79,7 @@ namespace sasipca_API
             builder.Services.AddScoped<JobSchedulerService>();
             builder.Services.AddScoped<AnuncioService>();
             builder.Services.AddScoped<IAuthService, AuthService>();
-            builder.Services.AddScoped<IAnuncioService, AnuncioService>();
+            builder.Services.AddScoped<IProductService, ProductService>();
             builder.Services.AddScoped<IJWTService, JWTService>();
             builder.Services.AddTransient<IEmailService, EmailService>();
 
