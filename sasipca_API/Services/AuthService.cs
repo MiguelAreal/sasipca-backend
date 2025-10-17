@@ -1,7 +1,6 @@
 ﻿using BCrypt.Net;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using sasipca_API.Data;
 using sasipca_API.DBModels;
 using sasipca_API.Services.Interfaces;
 using System.Security.Claims;

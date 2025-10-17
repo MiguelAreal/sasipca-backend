@@ -1,6 +1,5 @@
 ﻿using System.IO;
 using System.Threading.Tasks;
-using global::sasipca_API.Data;
 using global::sasipca_API.Models;
 using Microsoft.AspNetCore.Http;
 using SixLabors.ImageSharp;
@@ -15,16 +14,10 @@ namespace sasipca_API.Services
         /// </summary>
         public class ImageProcessingService
         {
-            private readonly AzureStorageService _storageService;
 
 
-            /// <summary>
-            /// Construtor que inicializa uma instância do serviço de armazenamento do Azure.
-            /// </summary>
-            /// <param name="storageService"></param>
-            public ImageProcessingService(AzureStorageService storageService)
+            public ImageProcessingService()
             {
-                _storageService = storageService;
             }
 
             /// <summary>
@@ -53,25 +46,5 @@ namespace sasipca_API.Services
                 return outputStream.ToArray();
             }
 
-
-            /// <summary>
-            /// Método auxiliar para processar as imagens.
-            /// </summary>
-            /// <param name="imagensFicheiros">Imagens dadas pelo utilizador.</param>
-            /// <returns>Lista de imagens processadas</returns>
-            public async Task<List<Imagens>> ProcessarImagens(List<IFormFile> imagensFicheiros)
-            {
-                var imagens = new List<Imagens>();
-                foreach (var imagem in imagensFicheiros.Take(4)) // Máximo de 4 imagens
-                {
-                    var optimizedImage = await ProcessImageAsync(imagem); // Otimiza imagem
-
-                    using var stream = new MemoryStream(optimizedImage);
-                    string imageUrl = await _storageService.UploadImageStreamAsync(stream, imagem.ContentType);
-
-                    imagens.Add(new Imagens { Url = imageUrl });
-                }
-                return imagens;
-            }
         }
 }

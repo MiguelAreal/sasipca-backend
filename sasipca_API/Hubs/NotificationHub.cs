@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using sasipca_API.Services;
+using sasipca_API.Services.Interfaces;
 using System.Security.Claims;
 using System.Threading.Tasks;
 
@@ -12,10 +13,10 @@ namespace sasipca_API.Hubs
         // Dicionário para mapear utilizadores às suas conexões
         private static readonly Dictionary<int, HashSet<string>> _userConnections = new();
         private static readonly object _lock = new();
-        private readonly NotificacaoService _notifService;
+        private readonly INotificationService _notifService;
 
         // Injeção de dependência via construtor
-        public NotificationHub(NotificacaoService notifService)
+        public NotificationHub(INotificationService notifService)
         {
             _notifService = notifService;
         }
@@ -39,8 +40,8 @@ namespace sasipca_API.Hubs
             }
 
             // Fetch and send notifications to the user upon connection
-            var notifications = await _notifService.ObterNotificacoesUser(userIdInt);
-            await Clients.Caller.SendAsync("LoadNotifications", notifications);
+            //var notifications = await _notifService.ObterNotificacoesUser(userIdInt);
+            await Clients.Caller.SendAsync("LoadNotifications", "a");
 
             await base.OnConnectedAsync();
         }
@@ -78,43 +79,5 @@ namespace sasipca_API.Hubs
             }
         }
 
-        /// <summary>
-        /// Método para apagar uma notificação específica.
-        /// </summary>
-        /// <param name="notificationId">ID da notificação a apagar.</param>
-        /// <returns>Tarefa assíncrona</returns>
-        public async Task DeleteNotification(int notificationId)
-        {
-            var userId = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId) || !int.TryParse(userId, out int userIdInt))
-            {
-                return;
-            }
-
-            var success = await _notifService.DeleteNotificacao(notificationId, userIdInt);
-            if (success)
-            {
-                await Clients.Caller.SendAsync("NotificationDeleted", notificationId);
-            }
-        }
-
-        /// <summary>
-        /// Método para apagar todas as notificações do utilizador conectado.
-        /// </summary>
-        /// <returns>Tarefa assíncrona</returns>
-        public async Task DeleteAllNotifications()
-        {
-            var userId = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId) || !int.TryParse(userId, out int userIdInt))
-            {
-                return;
-            }
-
-            var success = await _notifService.DeleteAllNotificacoes(userIdInt);
-            if (success)
-            {
-                await Clients.Caller.SendAsync("AllNotificationsDeleted");
-            }
-        }
     }
 }

@@ -7,7 +7,9 @@
     {
         public int Id { get; set; }
         public string Lot { get; set; } = null!;
-        public int Quantity { get; set; }
         public DateOnly ExpiryDate { get; set; }
+        public int TotalQuantity { get; set; }
+        public int ReservedQuantity { get; set; }
+        public int AvailableStock { get; set; }
     }
 }

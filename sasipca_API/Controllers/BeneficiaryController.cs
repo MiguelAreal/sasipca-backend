@@ -7,9 +7,7 @@ using sasipca_API.Models;
 using sasipca_API.Services;
 using sasipca_API.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
-using sasipca_API.Data;
 using sasipca_API.Dtos;
-using sasipca_API.Dtos.sasipca_API.Dtos;
 using sasipca_API.DBModels;
 using Humanizer;
 
@@ -26,6 +24,7 @@ namespace sasipca_API.Controllers
         private readonly SasipcaContext _dbContext;
         private readonly IAuthService _authService;
         private readonly IJWTService _jwtService;
+        private readonly IBeneficiaryService _beneficiaryService;
 
         /// <summary>
         /// Inicialização do BeneficiaryController
@@ -33,11 +32,12 @@ namespace sasipca_API.Controllers
         /// <param name="authService">Serviço de autenticação</param>
         /// <param name="jwtService">Serviço JWT</param>
         /// <param name="context">Contexto da base de dados</param>
-        public BeneficiaryController(IAuthService authService, IJWTService jwtService, SasipcaContext context)
+        public BeneficiaryController(IAuthService authService, IJWTService jwtService, SasipcaContext context, IBeneficiaryService beneficiaryService)
         {
             _dbContext = context;
             _authService = authService;
             _jwtService = jwtService;
+            _beneficiaryService = beneficiaryService;
         }
 
         /// <summary>
@@ -55,7 +55,7 @@ namespace sasipca_API.Controllers
         [Produces("application/json")]
         [HttpPost()]
         [AllowAnonymous]
-        public async Task<IActionResult> RegistarBeneficiario([FromBody] BeneficiaryPostDTO beneficiaryPostDto)
+        public async Task<IActionResult> PostBeneficiary([FromBody] BeneficiaryPostDTO beneficiaryPostDto)
         {
             try
             {
@@ -114,7 +114,7 @@ namespace sasipca_API.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(Resposta))]
         [Produces("application/json")]
         [HttpPut("{beneficiaryId}")]
-        public async Task<IActionResult> AtualizarBeneficiario(int beneficiaryId, [FromBody] BeneficiaryPutDTO beneficiaryPutDto)
+        public async Task<IActionResult> PutBeneficiary(int beneficiaryId, [FromBody] BeneficiaryPutDTO beneficiaryPutDto)
         {
             try
             {
@@ -194,25 +194,87 @@ namespace sasipca_API.Controllers
 
 
         /// <summary>
-        /// Busca um beneficiário específico.
+        /// Busca todos os beneficiários existentes consoante filtros.
         /// </summary>
         /// <remarks>
-        /// Apenas é possível consultar beneficiários que partilhem o mesmo código postal.
-        /// </remarks>
+        /// <param name="pageNumber">Número da página (começa em 1)</param>
+        /// <param name="pageSize">Quantidade de itens por página (máx. 50)</param>
+        /// <param name="orderBy">Ordenação Alfabética ("asc" = Ascendente, "desc" = Descendente</param>
+        /// <param name="searchTerm">Termo para busca por nome</param>
+        /// <returns>Lista paginada de beneficiários</returns>
+        [HttpGet()]
+        public async Task<ActionResult<PaginatedResponse<BeneficiaryListDTO>>> GetProfiles(
+             [FromQuery] int pageNumber = 1,
+             [FromQuery] int pageSize = 10,
+             [FromQuery] string orderBy = "asc",
+             [FromQuery] string searchTerm = "")
+        {
+            try
+            {
+                // Validação dos parâmetros
+                if (pageNumber < 1) pageNumber = 1;
+                if (pageSize < 1 || pageSize > 50) pageSize = 10;
+                if (orderBy != "asc" && orderBy != "desc")
+                    return BadRequest(new Resposta("Parâmetro orderBy deve ser 'asc' ou 'desc'"));
+
+                var beneficiaries = await _beneficiaryService.GetBeneficiaries(searchTerm);
+
+                beneficiaries = orderBy == "desc"
+                    ? beneficiaries.OrderByDescending(a => a.Name).ToList()
+                    : beneficiaries.OrderBy(a => a.Name).ToList();
+
+                if (!beneficiaries.Any())
+                {
+                    return NotFound(new Resposta("Nenhum beneficiário encontrado com os filtros e termo de pesquisa."));
+                }
+
+                // Aplica paginação
+                var totalCount = beneficiaries.Count;
+                var pagedBeneficiaries = beneficiaries
+                    .Skip((pageNumber - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToList();
+
+                // Cria resposta paginada
+                var paginatedResponse = new PaginatedResponse<BeneficiaryListDTO>
+                {
+                    Data = pagedBeneficiaries,
+                    PageNumber = pageNumber,
+                    PageSize = pageSize,
+                    TotalCount = totalCount,
+                    TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+                };
+
+                if (!paginatedResponse.Data.Any())
+                {
+                    return NotFound(new Resposta("Página solicitada está vazia."));
+                }
+
+                return Ok(paginatedResponse);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError,
+                                  new Resposta("Ocorreu um erro interno ao obter os beneficiários."));
+            }
+        }
+
+
+        /// <summary>
+        /// Busca um beneficiário específico.
+        /// </summary>
         /// <param name="beneficiaryId">ID do beneficiário a consultar</param>
-        /// <returns>Lista de beneficiários ou detalhes de um beneficiário</returns>
+        /// <returns>Detalhes de um beneficiário</returns>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<BeneficiaryGetDTO>))]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(BeneficiaryGetDTO))]
         [ProducesResponseType(StatusCodes.Status401Unauthorized, Type = typeof(Resposta))]
         [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(Resposta))]
         [Produces("application/json")]
         [HttpGet("{beneficiaryId}")]
-        public async Task<ActionResult<Resposta>> BuscarPerfil(int beneficiaryId)
+        public async Task<ActionResult<Resposta>> GetProfile(int beneficiaryId)
         {
             try
             {
-                var userId = (int)HttpContext.Items["UserId"];
-
                 var beneficiary = await _dbContext.Beneficiaries
                     .Where(p => p.Id == beneficiaryId)
                     .Select(p => new BeneficiaryGetDTO

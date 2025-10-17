@@ -13,7 +13,7 @@ public partial class Product
 
     public int CategoryId { get; set; }
 
-    public int? Quantity { get; set; }
+    public int? UnitSize { get; set; }
 
     public virtual CategoryType Category { get; set; } = null!;
 

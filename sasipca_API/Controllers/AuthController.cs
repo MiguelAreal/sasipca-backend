@@ -3,10 +3,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
 using System.Threading.Tasks;
 using System.IdentityModel.Tokens.Jwt;
-using sasipca_API.Models;
 using sasipca_API.Services;
 using sasipca_API.Dtos;
-using sasipca_API.Data;
+using sasipca_API.Models;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -32,7 +31,7 @@ namespace sasipca_API.Controllers
         private readonly IJWTService _jwtService;
         private readonly IEmailService _emailService;
         private readonly int _refreshTokenValidityMinutes;
-        private readonly INotificacaoService _notificacaoService;
+        private readonly INotificationService _notificacaoService;
 
         /// <summary>
         /// Inicialização do AuthController.
@@ -46,7 +45,7 @@ namespace sasipca_API.Controllers
         /// <param name="context"></param>
         /// <param name="config"></param>
         /// <param name="notificacaoService"></param>
-        public AuthController(IAuthService authService, IJWTService jwtService, IEmailService emailService, SasipcaContext context, IConfiguration config,INotificacaoService notificacaoService)
+        public AuthController(IAuthService authService, IJWTService jwtService, IEmailService emailService, SasipcaContext context, IConfiguration config, INotificationService notificacaoService)
         {
             _dbcontext = context;
             _authService = authService;
@@ -254,7 +253,7 @@ namespace sasipca_API.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(Resposta))]
         [HttpPost("forgot-password")]
         [AllowAnonymous]
-        public async Task<IActionResult> EsqueciPassword([FromBody] EsqueciPwdDTO esqueciPwdDto)
+        public async Task<IActionResult> ForgotPassword([FromBody] EsqueciPwdDTO esqueciPwdDto)
         {
             try
             {
@@ -321,7 +320,7 @@ namespace sasipca_API.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(Resposta))]
         [HttpPost("password-reset")]
         [AllowAnonymous]
-        public async Task<IActionResult> RedefinirPassword([FromBody] AtribuirNovaPwdDTO atribuirNovaPwdDTO)
+        public async Task<IActionResult> ResetPassword([FromBody] AtribuirNovaPwdDTO atribuirNovaPwdDTO)
         {
             try
             {

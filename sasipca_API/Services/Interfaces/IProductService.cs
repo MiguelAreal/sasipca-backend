@@ -6,6 +6,7 @@ namespace sasipca_API.Services.Interfaces
 {
     public interface IProductService
     {
-        Task<List<ProductListDTO>> GetProducts(string searchTerm);
+        Task<List<ProductListDTO>> GetAllProducts(string searchTerm);
+        Task<List<ProductListDTO>> GetProduct(string searchTerm);
     }
 }

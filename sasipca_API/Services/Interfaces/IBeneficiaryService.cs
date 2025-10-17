@@ -4,8 +4,8 @@ using System.Threading.Tasks;
 
 namespace sasipca_API.Services.Interfaces
 {
-    public interface IAnuncioService
+    public interface IBeneficiaryService
     {
-        Task<List<AnuncioListaDTO>> ObterAnuncios(string userPostalCode, string searchTerm, int? userId = null);
+        Task<List<BeneficiaryListDTO>> GetBeneficiaries(string searchTerm);
     }
 }

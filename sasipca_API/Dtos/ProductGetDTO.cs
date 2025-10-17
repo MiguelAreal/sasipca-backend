@@ -22,7 +22,7 @@ namespace sasipca_API.Dtos
         /// <summary>
         /// Quantidade do produto (quanto vem num pacote)
         /// </summary>
-        public int? Quantity { get; set; }
+        public int? UnitSize { get; set; }
 
         /// <summary>
         /// Objeto que contém o identificador e nome da categoria do produto.
@@ -33,11 +33,23 @@ namespace sasipca_API.Dtos
         /// Objeto que contém o identificador e nome da categoria do produto.
         /// </summary>
         public string Unit { get; set; } = null!;
+       
+        /// <summary>
+        /// Quantidade total real/tangível do produto (De todos os lotes combinado)
+        /// </summary>
+        public int? TotalQuantity { get; set; }
 
         /// <summary>
-        /// Lista dos lotes associados ao produto.
+        /// Quantidade total reservada do produto (De todas as entregas planeadas)
         /// </summary>
-        public ICollection<ProductLotDTO> ProductLots { get; set; } = new List<ProductLotDTO>();
+        public int? ReservedQuantity { get; set; }
+
+        /// <summary>
+        /// Quantidade total disponível do produto (Quantidade Total - Quantidade Reservada)
+        /// </summary>
+        public int? AvailableStock { get; set; }
+
+        public List<ProductLotDTO> ProductLots { get; set; } = new List<ProductLotDTO>();
 
     }
 }

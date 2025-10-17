@@ -7,7 +7,6 @@ using sasipca_API.Services;
 using System.Text;
 using DotNetEnv;
 using System.Reflection;
-using sasipca_API.Data;
 using Hangfire;
 using sasipca_API.Middleware;
 using System.Threading.RateLimiting;
@@ -73,13 +72,12 @@ namespace sasipca_API
             var builder = WebApplication.CreateBuilder(args);
 
             //Adicionar dependências de Serviços.
-            builder.Services.AddScoped<INotificacaoService,NotificacaoService>();
-            builder.Services.AddSingleton<AzureStorageService>();
+            builder.Services.AddScoped<INotificationService, NotificationService>();
             builder.Services.AddScoped<ImageProcessingService>();
             builder.Services.AddScoped<JobSchedulerService>();
-            builder.Services.AddScoped<AnuncioService>();
             builder.Services.AddScoped<IAuthService, AuthService>();
             builder.Services.AddScoped<IProductService, ProductService>();
+            builder.Services.AddScoped<IBeneficiaryService, BeneficiaryService>();
             builder.Services.AddScoped<IJWTService, JWTService>();
             builder.Services.AddTransient<IEmailService, EmailService>();
 
@@ -88,11 +86,6 @@ namespace sasipca_API
             builder.Services.AddWebSockets(options => {
                 options.KeepAliveInterval = TimeSpan.FromMinutes(2);
             });
-
-
-            // Regista o DbContext para usar a string de conexão (Neighbourlink)
-            builder.Services.AddDbContext<NLDbContext>(options =>
-                options.UseSqlServer(connectionString));
 
             // Regista o DBContext para usar a string de Conexão
             builder.Services.AddDbContext<SasipcaContext>(options =>
@@ -242,9 +235,6 @@ namespace sasipca_API
                     Description = "API para a aplicação sasipca"
                 });
 
-
-
-
                 // Configurar suporte para autenticação JWT no Swagger
                 options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
                 {
@@ -289,7 +279,6 @@ namespace sasipca_API
                     // Permite que o Swagger envie cookies junto com as requisições
                     c.ConfigObject.AdditionalItems["requestCredentials"] = "include";
                 });
-
             }
 
 

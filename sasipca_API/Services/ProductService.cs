@@ -1,9 +1,6 @@
-﻿// Services/AnuncioService.cs
-using Microsoft.EntityFrameworkCore;
-using sasipca_API.Data;
+﻿using Microsoft.EntityFrameworkCore;
 using sasipca_API.DBModels;
 using sasipca_API.Dtos;
-using sasipca_API.Enumerators;
 using sasipca_API.Services.Interfaces;
 
 namespace sasipca_API.Services
@@ -17,22 +14,98 @@ namespace sasipca_API.Services
             _dbcontext = context;
         }
 
-        public async Task<List<ProductListDTO>> GetProducts(string searchTerm)
+        public async Task<List<ProductListDTO>> GetAllProducts(string searchTerm)
         {
             var searchTermLower = searchTerm?.ToLower() ?? string.Empty;
 
+            // 💡 SOLUÇÃO: Forçar a execução no banco de dados aqui.
+            // Isso é seguro, pois o GroupBy e Sum reduzem o volume de dados drasticamente.
+            var totalStockData = await _dbcontext.VStockPerLots
+                .GroupBy(v => v.Barcode)
+                .Select(g => new
+                {
+                    Barcode = g.Key,
+                    TotalQuantity = g.Sum(x => x.TotalQuantity),
+                    ReservedQuantity = g.Sum(x => x.ReservedQuantity),
+                    AvailableStock = g.Sum(x => x.AvailableStock)
+                })
+                .ToListAsync(); // <--- CHAVE: Executar a agregação primeiro no DB
+
+            // Step 2: Query Products and perform a LEFT JOIN (GroupJoin) IN MEMORY.
+            // O GroupJoin (e FirstOrDefault) agora é feito sobre uma lista em memória.
+            var productsQuery = _dbcontext.Products
+                .Where(p => (string.IsNullOrEmpty(searchTerm) || p.Name.ToLower().Contains(searchTermLower)))
+                .Include(p => p.Category)
+                .Include(p => p.Unit)
+                .ToList() // <--- O GroupJoin será feito sobre esta lista em memória
+                .GroupJoin(
+                    totalStockData,
+                    product => product.Barcode,
+                    stock => stock.Barcode,
+                    (product, stockGroup) => new { Product = product, Stock = stockGroup.FirstOrDefault() }
+                )
+                // O restante da projeção é o mesmo
+                .Select(p => new ProductListDTO
+                {
+                    Barcode = p.Product.Barcode,
+                    Name = p.Product.Name,
+                    Unit = p.Product.Unit.Type,
+                    Category = p.Product.Category.Type,
+                    TotalQuantity = p.Stock != null ? p.Stock.TotalQuantity : 0,
+                    // 💡 Observação: Assegure-se de que p.Stock.ReservedQuantity/AvailableStock
+                    // sejam do tipo C# 'decimal' ou 'int?' se você quiser o cast.
+                    ReservedQuantity = p.Stock != null ? (int)p.Stock.ReservedQuantity : 0,
+                    AvailableStock = p.Stock != null ? (int)p.Stock.AvailableStock : 0
+                });
+
+            // Retorna o resultado que já está em memória (não precisa de .ToListAsync() no final)
+            return productsQuery.ToList();
+        }
+
+        public async Task<List<ProductListDTO>> GetProduct(string searchTerm)
+        {
+            var searchTermLower = searchTerm?.ToLower() ?? string.Empty;
+
+            // Step 1: Aggregate the stock data from the VAvailableStockPerLot view by Barcode.
+            // This is crucial because the view provides stock PER LOT, but the DTO needs the TOTAL stock.
+            var totalStockData = _dbcontext.VStockPerLots
+                .GroupBy(v => v.Barcode)
+                .Select(g => new
+                {
+                    Barcode = g.Key,
+                    TotalQuantity = g.Sum(x => x.TotalQuantity),
+                    ReservedQuantity = g.Sum(x => x.ReservedQuantity),
+                    AvailableStock = g.Sum(x => x.AvailableStock)
+                });
+
+            // Step 2: Query Products and perform a LEFT JOIN (GroupJoin) with the aggregated stock data.
             var products = _dbcontext.Products
                 .Where(p => (string.IsNullOrEmpty(searchTerm) || p.Name.ToLower().Contains(searchTermLower)))
                 .Include(p => p.Category)
                 .Include(p => p.Unit)
+                .GroupJoin(
+                    totalStockData,
+                    product => product.Barcode,
+                    stock => stock.Barcode,
+                    (product, stockGroup) => new { Product = product, Stock = stockGroup.FirstOrDefault() }
+                )
+
+                // Step 3: Project the result into the ProductListDTO.
                 .Select(p => new ProductListDTO
                 {
-                    Barcode = p.Barcode,
-                    Name = p.Name,
-                    Unit = p.Unit.Type,
-                    Category = p.Category.Type
+                    Barcode = p.Product.Barcode,
+                    Name = p.Product.Name,
+                    Unit = p.Product.Unit.Type,
+                    Category = p.Product.Category.Type,
+                    TotalQuantity = p.Stock != null ? p.Stock.TotalQuantity : 0,
+                    ReservedQuantity = p.Stock != null ? (int?)p.Stock.ReservedQuantity : 0, // Cast decimal to int?
+                    AvailableStock = p.Stock != null ? (int?)p.Stock.AvailableStock : 0      // Cast decimal to int?
                 });
+
             return await products.ToListAsync();
         }
+
+
+
     }
 }
