@@ -168,9 +168,9 @@ namespace sasipca_API.Controllers
         /// </summary>
         /// <param name="query">Parâmetros de filtro (StatusId, BeneficiaryId, DateFrom, DateTo).</param>
         /// <returns>Lista de cabeçalhos de entregas.</returns>
-        /*[HttpGet]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<VDeliveries>))]
-        public async Task<ActionResult<IEnumerable<VDeliveries>>> GetDeliveries([FromQuery] DeliveryQueryDTO query)
+        [HttpGet]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<VDelivery>))]
+        public async Task<ActionResult<IEnumerable<VDelivery>>> GetDeliveries([FromQuery] DeliveryQueryDTO query)
         {
             // Usamos a View pré-agregada que já contém todos os nomes e o status em formato string.
             var deliveriesQuery = _dbContext.VDeliveries.AsQueryable();
@@ -210,7 +210,7 @@ namespace sasipca_API.Controllers
                 .ToListAsync();
 
             return Ok(result);
-        }*/
+        }
     }
 
 }

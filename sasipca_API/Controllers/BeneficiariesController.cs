@@ -19,17 +19,17 @@ namespace sasipca_API.Controllers
     [Route("api/beneficiaries")]
     [ApiController]
     [Authorize]
-    public class BeneficiaryController : ControllerBase
+    public class BeneficiariesController : ControllerBase
     {
         private readonly SasipcaContext _dbContext;
         private readonly IBeneficiaryService _beneficiaryService;
 
         /// <summary>
-        /// Inicialização do BeneficiaryController
+        /// Inicialização do BeneficiariesController.
         /// </summary>
         /// <param name="beneficiaryService">Serviço de beneficiários</param>
         /// <param name="context">Contexto da base de dados</param>
-        public BeneficiaryController(SasipcaContext context, IBeneficiaryService beneficiaryService)
+        public BeneficiariesController(SasipcaContext context, IBeneficiaryService beneficiaryService)
         {
             _dbContext = context;
             _beneficiaryService = beneficiaryService;
