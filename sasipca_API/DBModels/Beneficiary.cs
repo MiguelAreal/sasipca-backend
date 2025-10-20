@@ -29,6 +29,8 @@ public partial class Beneficiary
 
     public virtual BeneficiaryAddress? Address { get; set; }
 
+    public virtual User CreatedByNavigation { get; set; } = null!;
+
     public virtual ICollection<Delivery> Deliveries { get; set; } = new List<Delivery>();
 
     public virtual ICollection<ParticularOb> ParticularObs { get; set; } = new List<ParticularOb>();

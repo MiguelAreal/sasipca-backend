@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 namespace sasipca_API.Services
 {
     /// <summary>
-    /// Serviço responsável por agendar a atualização do estado de eventos e serviços com base nas suas datas de início.
+    /// Serviço responsável por agendar a atualização de estados.
     /// </summary>
     public class JobSchedulerService : IJobSchedulerService
     {
@@ -28,6 +28,8 @@ namespace sasipca_API.Services
             _dbcontext = dbcontext;
             _notifService = notifService;
         }
+
+
 
     }
 }

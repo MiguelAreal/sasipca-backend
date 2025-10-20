@@ -5,10 +5,12 @@ using sasipca_API.DBModels;
 using sasipca_API.Dtos;
 using sasipca_API.Enumerators;
 using sasipca_API.Models;
+using sasipca_API.Services;
+using sasipca_API.Services.Interfaces;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging; // Se estiver a usar logging
 
 [Route("api/inventory")]
 [ApiController]
@@ -16,148 +18,92 @@ using Microsoft.Extensions.Logging; // Se estiver a usar logging
 public class InventoryController : ControllerBase
 {
     private readonly SasipcaContext _dbContext;
-    // private readonly ILogger<InventoryController> _logger; // Exemplo de logger
-
-    public InventoryController(SasipcaContext context /*, ILogger<InventoryController> logger */)
+    /// <summary>
+    /// Inicialização de InventoryController.
+    /// Lida com entradas e ajustes de stock.
+    /// </summary>
+    /// <param name="context"></param>
+    public InventoryController(SasipcaContext context)
     {
         _dbContext = context;
-        // _logger = logger;
     }
 
     // ----------------------------------------------------
-    // ENDPOINT 1: CRIAÇÃO DE PRODUTO E PRIMEIRA ENTRADA (NOVO)
+    // ENDPOINT 1 : ENTRADA DE STOCK / CRIAÇÃO DE PRODUTO + PRIMEIRA ENTRADA
     // ----------------------------------------------------
     /// <summary>
-    /// Regista um novo Produto e a sua primeira entrada de Stock, criando o lote inicial.
-    /// (Deve ser usado quando o GET/consulta inicial devolve 404).
+    /// Regista uma Entrada de Stock. Pode criar um novo Produto e o seu stock inicial
+    /// ou adicionar stock a lotes de um Produto já existente.
     /// </summary>
-    [HttpPost("product-receipt")]
+    [HttpPost("receipt")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(Resposta))]
-    public async Task<ActionResult> RegisterProductAndInitialStock([FromBody] ProductCreationReceiptDTO dto)
+    public async Task<ActionResult> StockReceipt([FromBody] StockReceiptDTO dto)
     {
         var userId = (int)HttpContext.Items["UserId"];
+        var barcode = dto.Barcode;
 
         if (!ModelState.IsValid)
         {
             return BadRequest(ModelState);
         }
 
-        // 1. Validação de Existência (Não deve existir)
-        if (await _dbContext.Products.AnyAsync(p => p.Barcode == dto.Barcode))
-        {
-            return BadRequest(new Resposta($"O Produto com o Barcode '{dto.Barcode}' já existe. Use o endpoint 'receipt' para adicionar stock."));
-        }
-
         using var transaction = await _dbContext.Database.BeginTransactionAsync();
+
         try
         {
-            // 2. Criar o Produto Mestre
-            var newProduct = new Product
-            {
-                Barcode = dto.Barcode,
-                Name = dto.Name,
-                CategoryId = dto.CategoryId,
-                UnitId = dto.UnitId,
-                UnitSize = dto.UnitSize
-            };
-            _dbContext.Products.Add(newProduct);
+            // O tipo de 'product' é inferido. Assumindo que o Barcode é a chave.
+            var product = await _dbContext.Products.FirstOrDefaultAsync(p => p.Barcode == barcode);
+            var isNewProduct = product == null;
 
-            // 3. Criar o Lote Inicial (ProductLot)
-            var newLot = new ProductLot
+            // 1. Validação de Dados de Criação
+            if (isNewProduct)
             {
-                Barcode = dto.Barcode,
-                Lot = dto.InitialLot.Lot,
-                Quantity = dto.InitialLot.Quantity,
-                ExpiryDate = dto.InitialLot.ExpiryDate
-            };
-            _dbContext.ProductLots.Add(newLot);
+                // Produto não existe. É obrigatório fornecer todos os dados mestre.
+                // Estou a assumir que 'dto' tem estas propriedades como 'string?', 'int?' etc.
+                if (string.IsNullOrEmpty(dto.Name) || dto.CategoryId == null || dto.UnitId == null)
+                {
+                    await transaction.RollbackAsync();
+                    return BadRequest(new Resposta($"Produto com Barcode '{barcode}' não existe. É obrigatório fornecer o Nome, CategoryId e UnitId para a criação."));
+                }
 
-            // 4. Criar o cabeçalho da Movimentação (Entrada/1)
+                // 2. Criar o Produto Mestre
+                product = new Product
+                {
+                    Barcode = dto.Barcode,
+                    Name = dto.Name!,
+                    CategoryId = dto.CategoryId!.Value,
+                    UnitId = dto.UnitId!.Value,
+                    UnitSize = dto.UnitSize
+                };
+                _dbContext.Products.Add(product);
+            }
+            // ELSE: Produto existe. Os campos Name, CategoryId, etc. são ignorados.
+
+            // 3. Criar o cabeçalho da Movimentação
             var newMovement = new Movement
             {
                 UserId = userId,
                 MovementTypeId = (int)Enums.MovementTypes.Entrada,
                 CreatedAt = DateTime.UtcNow,
-                Note = dto.Note ?? "Criação de produto e primeira entrada de stock."
+                Note = dto.Note ?? (isNewProduct ? "Criação de produto e primeira entrada de stock." : "Entrada de stock (receção).")
             };
             _dbContext.Movements.Add(newMovement);
 
-            // 5. Criar o Item da Movimentação (log)
-            newMovement.MovementItems.Add(new MovementItem
-            {
-                ProductLot = newLot,
-                Quantity = newLot.Quantity
-            });
-
-            await _dbContext.SaveChangesAsync();
-            await transaction.CommitAsync();
-
-            return StatusCode(StatusCodes.Status201Created, new Resposta($"Produto '{dto.Name}' e lote inicial registados com sucesso."));
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync();
-            // _logger.LogError(ex, "Erro ao registar produto e primeira entrada de stock.");
-            return StatusCode(StatusCodes.Status500InternalServerError, new Resposta("Ocorreu um erro interno ao criar o produto e o stock inicial."));
-        }
-    }
-
-
-    // ----------------------------------------------------
-    // ENDPOINT 2: ENTRADA DE STOCK (RECEIPT) - PARA PRODUTOS JÁ EXISTENTES
-    // ----------------------------------------------------
-    /// <summary>
-    /// Regista uma Entrada de Stock, criando lotes ou adicionando stock a lotes existentes.
-    /// (Requer que o produto já exista.)
-    /// </summary>
-    [HttpPost("receipt")]
-    [ProducesResponseType(StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(Resposta))]
-    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(Resposta))] // Adicionado 404
-    public async Task<ActionResult> RegisterReceipt([FromBody] StockReceiptDTO dto)
-    {
-        var userId = (int)HttpContext.Items["UserId"];
-
-        if (!ModelState.IsValid)
-        {
-            return BadRequest(ModelState);
-        }
-
-        if (!dto.LotsToEnter.Any())
-        {
-            return BadRequest(new Resposta("A movimentação de entrada deve conter pelo menos um lote."));
-        }
-
-        using var transaction = await _dbContext.Database.BeginTransactionAsync();
-
-        try
-        {
-            var barcode = dto.Barcode;
-
-            // 1. Validação de Existência (ESTRITAMENTE OBRIGATÓRIA)
-            var productExists = await _dbContext.Products.AnyAsync(p => p.Barcode == barcode);
-
-            if (!productExists)
-            {
-                transaction.Rollback();
-                // Retorna 404, forçando o cliente a usar o endpoint "product-receipt"
-                return NotFound(new Resposta($"Produto com Barcode '{barcode}' não encontrado. Use 'product-receipt' para registar novos produtos."));
-            }
-
-            // 2. Criar o cabeçalho da Movimentação
-            var newMovement = new Movement
-            {
-                UserId = userId,
-                MovementTypeId = (int)Enums.MovementTypes.Entrada,
-                Note = dto.Note
-            };
-            _dbContext.Movements.Add(newMovement);
+            // Salvar para garantir o rastreio do produto/movimentação.
             await _dbContext.SaveChangesAsync();
 
-            // 3. Processar Lotes
+
+            // 4. Processar Lotes
             foreach (var itemDto in dto.LotsToEnter)
             {
+                // Validação de lote: a quantidade tem que ser positiva para entrada
+                if (itemDto.Quantity <= 0)
+                {
+                    await transaction.RollbackAsync();
+                    return BadRequest(new Resposta($"A quantidade para o lote '{itemDto.Lot}' deve ser positiva."));
+                }
+
                 var productLot = await _dbContext.ProductLots
                     .FirstOrDefaultAsync(pl => pl.Barcode == barcode && pl.Lot == itemDto.Lot);
 
@@ -165,6 +111,11 @@ public class InventoryController : ControllerBase
                 {
                     // Lote existe: Apenas adiciona a quantidade
                     productLot.Quantity += itemDto.Quantity;
+
+                    if (productLot.ExpiryDate < itemDto.ExpiryDate)
+                    {
+                        productLot.ExpiryDate = itemDto.ExpiryDate;
+                    }
                 }
                 else
                 {
@@ -174,14 +125,15 @@ public class InventoryController : ControllerBase
                         Barcode = barcode,
                         Lot = itemDto.Lot,
                         Quantity = itemDto.Quantity,
-                        ExpiryDate = itemDto.ExpiryDate
+                        ExpiryDate = itemDto.ExpiryDate // Assumindo DateOnly?
                     };
                     _dbContext.ProductLots.Add(productLot);
                 }
 
-                // 4. Criar o Itens da Movimentação (log)
+                // 5. Criar o Item da Movimentação (log)
                 newMovement.MovementItems.Add(new MovementItem
                 {
+                    // Usa a instância productLot que foi criada ou carregada
                     ProductLot = productLot,
                     Quantity = itemDto.Quantity
                 });
@@ -190,13 +142,116 @@ public class InventoryController : ControllerBase
             await _dbContext.SaveChangesAsync();
             await transaction.CommitAsync();
 
-            return StatusCode(StatusCodes.Status201Created, new Resposta("Entrada de stock e registo de lotes concluídos com sucesso."));
+            var successMessage = isNewProduct
+                ? $"Produto '{dto.Name}' e lote(s) inicial(is) registados com sucesso."
+                : $"Entrada de stock para o produto '{barcode}' concluída com sucesso.";
+
+            return StatusCode(StatusCodes.Status201Created, new Resposta(successMessage));
         }
         catch (Exception ex)
         {
             await transaction.RollbackAsync();
-            // _logger.LogError(ex, "Erro ao registar entrada de stock.");
+            // _logger.LogError(ex, "Erro ao processar a entrada de stock unificada.");
             return StatusCode(StatusCodes.Status500InternalServerError, new Resposta("Ocorreu um erro interno ao processar a entrada de stock."));
         }
     }
+
+
+    // ----------------------------------------------------
+    // ENDPOINT 2 : AJUSTE / CORREÇÃO DE STOCK
+    // ----------------------------------------------------
+    /// <summary>
+    /// Ajusta (adiciona ou remove) a quantidade de stock de um lote existente,
+    /// registando uma Movimentação de Ajuste.
+    /// A remoção está limitada ao stock disponível (Total - Reservado).
+    /// </summary>
+    [HttpPatch("adjustment")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(Resposta))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(Resposta))]
+    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(Resposta))]
+    public async Task<ActionResult> AdjustStock([FromBody] StockAdjustmentDTO dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        // Obter UserId
+        var userId = (int)HttpContext.Items["UserId"];
+
+        using var transaction = await _dbContext.Database.BeginTransactionAsync();
+
+        try
+        {
+            // 1. Encontrar o lote específico
+            var productLot = await _dbContext.ProductLots
+                .Include(pl => pl.BarcodeNavigation)
+                .FirstOrDefaultAsync(pl => pl.Barcode == dto.Barcode && pl.Lot == dto.Lot);
+
+            if (productLot == null)
+            {
+                await transaction.RollbackAsync();
+                return NotFound(new Resposta($"Produto/Lote '{dto.Barcode}' - '{dto.Lot}' não encontrado."));
+            }
+
+            var adjustment = dto.QuantityAdjustment;
+            var isReduction = adjustment < 0;
+            var quantityToAdjust = Math.Abs(adjustment); // Valor absoluto
+
+            // 2. Validação para Redução (Saída de Stock)
+            if (isReduction)
+            {
+                // 2.1. Calcular Stock Reservado
+                // Stock reservado são todas as DeliveryItems em Deliveries com StatusId = Agendada (1)
+                var reservedQuantity = await _dbContext.DeliveryItems
+                    .Where(di => di.ProductLotId == productLot.Id && di.Delivery.StatusId == (int)Enums.DeliveryStatus.Agendada)
+                    .SumAsync(di => di.Quantity);
+
+                // 2.2. Calcular Stock Disponível (Total - Reservado)
+                var availableStock = productLot.Quantity - reservedQuantity;
+
+                // 2.3. Validação: A quantidade a remover não pode exceder o stock disponível.
+                if (availableStock < quantityToAdjust)
+                {
+                    await transaction.RollbackAsync();
+                    return BadRequest(new Resposta($"Ajuste de redução bloqueado. O stock disponível para ajuste é {availableStock}, mas está a tentar remover {quantityToAdjust}."));
+                }
+            }
+
+            // 3. Aplicar o Ajuste ao Lote (ProductLot)
+            productLot.Quantity += adjustment;
+
+            // 4. Criar a Movimentação (Movement)
+            var newMovement = new Movement
+            {
+                UserId = userId,
+                MovementTypeId = (int)Enums.MovementTypes.AjusteInventario,
+                Note = dto.Note
+            };
+            _dbContext.Movements.Add(newMovement);
+            await _dbContext.SaveChangesAsync(); // Commit para obter Movement.Id (necessário para MovementItem)
+
+            // 5. Criar o Item da Movimentação (MovementItem)
+            newMovement.MovementItems.Add(new MovementItem
+            {
+                ProductLot = productLot, // Lote atualizado
+                Quantity = adjustment
+            });
+
+            await _dbContext.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            var action = isReduction ? "removida" : "adicionada";
+            return Ok(new Resposta($"Ajuste de stock concluído. Quantidade de {quantityToAdjust} {action} do produto '{productLot.BarcodeNavigation.Name}' (Lote: {dto.Lot})."));
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync();
+            // Registrar a exceção 'ex'
+            return StatusCode(StatusCodes.Status500InternalServerError, new Resposta("Ocorreu um erro interno ao processar o ajuste de stock."));
+        }
+    }
+
+
+
 }

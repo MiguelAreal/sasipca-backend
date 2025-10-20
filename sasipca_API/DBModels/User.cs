@@ -23,11 +23,15 @@ public partial class User
 
     public DateTime? RefreshTokenExp { get; set; }
 
+    public virtual ICollection<Beneficiary> Beneficiaries { get; set; } = new List<Beneficiary>();
+
     public virtual ICollection<Campaign> Campaigns { get; set; } = new List<Campaign>();
 
     public virtual ICollection<Delivery> Deliveries { get; set; } = new List<Delivery>();
 
     public virtual ICollection<Movement> Movements { get; set; } = new List<Movement>();
+
+    public virtual ICollection<Notification> Notifications { get; set; } = new List<Notification>();
 
     public virtual ICollection<ParticularOb> ParticularObs { get; set; } = new List<ParticularOb>();
 

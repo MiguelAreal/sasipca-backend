@@ -22,4 +22,6 @@ public partial class Notification
     public string? Message { get; set; }
 
     public virtual NotificationStatus Status { get; set; } = null!;
+
+    public virtual User User { get; set; } = null!;
 }

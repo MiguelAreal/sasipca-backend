@@ -16,27 +16,22 @@ namespace sasipca_API.Controllers
     /// <summary>
     /// Controller para gestão de beneficiários.
     /// </summary>
-    [Route("api/beneficiario")]
+    [Route("api/beneficiaries")]
     [ApiController]
     [Authorize]
     public class BeneficiaryController : ControllerBase
     {
         private readonly SasipcaContext _dbContext;
-        private readonly IAuthService _authService;
-        private readonly IJWTService _jwtService;
         private readonly IBeneficiaryService _beneficiaryService;
 
         /// <summary>
         /// Inicialização do BeneficiaryController
         /// </summary>
-        /// <param name="authService">Serviço de autenticação</param>
-        /// <param name="jwtService">Serviço JWT</param>
+        /// <param name="beneficiaryService">Serviço de beneficiários</param>
         /// <param name="context">Contexto da base de dados</param>
-        public BeneficiaryController(IAuthService authService, IJWTService jwtService, SasipcaContext context, IBeneficiaryService beneficiaryService)
+        public BeneficiaryController(SasipcaContext context, IBeneficiaryService beneficiaryService)
         {
             _dbContext = context;
-            _authService = authService;
-            _jwtService = jwtService;
             _beneficiaryService = beneficiaryService;
         }
 

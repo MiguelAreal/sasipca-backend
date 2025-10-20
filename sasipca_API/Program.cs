@@ -78,6 +78,7 @@ namespace sasipca_API
             builder.Services.AddScoped<IAuthService, AuthService>();
             builder.Services.AddScoped<IProductService, ProductService>();
             builder.Services.AddScoped<IBeneficiaryService, BeneficiaryService>();
+            builder.Services.AddScoped<IDeliveryService, DeliveryService>();
             builder.Services.AddScoped<IJWTService, JWTService>();
             builder.Services.AddTransient<IEmailService, EmailService>();
 

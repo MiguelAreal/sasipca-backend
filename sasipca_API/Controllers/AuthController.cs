@@ -130,7 +130,7 @@ namespace sasipca_API.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized, Type = typeof(Resposta))]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(Resposta))]
         [Produces("application/json")]
-        [HttpPost("refresh-token")]
+        [HttpPost("refresh")]
         [AllowAnonymous]
         public async Task<IActionResult> RefreshToken()
         {
@@ -242,7 +242,7 @@ namespace sasipca_API.Controllers
         /// O link contém um token válido por 1 hora.
         /// 
         /// Exemplo de requisição:
-        /// POST /api/forgot-password
+        /// POST /api//password/forgot
         /// {
         ///     "email": "utilizador@exemplo.pt"
         /// }
@@ -251,7 +251,7 @@ namespace sasipca_API.Controllers
         /// <returns>Mensagem de confirmação</returns>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(Resposta))]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(Resposta))]
-        [HttpPost("forgot-password")]
+        [HttpPost("/password/forgot")]
         [AllowAnonymous]
         public async Task<IActionResult> ForgotPassword([FromBody] EsqueciPwdDTO esqueciPwdDto)
         {
@@ -260,7 +260,7 @@ namespace sasipca_API.Controllers
                 var user = await _dbcontext.Users
                     .FirstOrDefaultAsync(p => p.Email == esqueciPwdDto.Email);
 
-                if (user == null)
+                if (user != null)
                 {
                     // Não revelar que o e-mail não existe por questões de segurança
                     return Ok(new Resposta("Se o e-mail existir, será enviado um link de redefinição."));
@@ -287,11 +287,11 @@ namespace sasipca_API.Controllers
                 var link = $"https://neighbourlink.pt/redefinir-password?token={Uri.EscapeDataString(token)}";
                 var placeholders = new Dictionary<string, string> { { "link", link } };
 
-                await _emailService.SendEmailAsync(
+                /*await _emailService.SendEmailAsync(
                     user.Email,
                     "Redefinição de Palavra-Passe",
                     "ForgotPasswordTemplate",
-                    placeholders);
+                    placeholders);*/
 
                 return Ok(new Resposta("Link de redefinição enviado para o seu e-mail."));
             }
@@ -308,7 +308,7 @@ namespace sasipca_API.Controllers
         /// Requer um token válido obtido através do endpoint 'forgot-password'.
         /// 
         /// Exemplo de requisição:
-        /// POST /api/password-reset
+        /// POST /api/password/reset
         /// {
         ///     "token": "token_gerado",
         ///     "novaPassword": "novaPasswordSegura123"
@@ -318,7 +318,7 @@ namespace sasipca_API.Controllers
         /// <returns>Mensagem de confirmação</returns>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(Resposta))]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(Resposta))]
-        [HttpPost("password-reset")]
+        [HttpPost("/password/reset")]
         [AllowAnonymous]
         public async Task<IActionResult> ResetPassword([FromBody] AtribuirNovaPwdDTO atribuirNovaPwdDTO)
         {

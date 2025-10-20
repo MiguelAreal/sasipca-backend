@@ -47,6 +47,12 @@ public partial class SasipcaContext : DbContext
 
     public virtual DbSet<User> Users { get; set; }
 
+    public virtual DbSet<VDelivery> VDeliveries { get; set; }
+
+    public virtual DbSet<VMovHistory> VMovHistories { get; set; }
+
+    public virtual DbSet<VMovHistoryDetail> VMovHistoryDetails { get; set; }
+
     public virtual DbSet<VStockPerLot> VStockPerLots { get; set; }
 
     public virtual DbSet<VStockPerProduct> VStockPerProducts { get; set; }
@@ -64,6 +70,8 @@ public partial class SasipcaContext : DbContext
             entity.ToTable("beneficiaries");
 
             entity.HasIndex(e => e.AddressId, "FK_beneficiaries_beneficiary_address");
+
+            entity.HasIndex(e => e.CreatedBy, "FK_beneficiaries_users");
 
             entity.Property(e => e.Id)
                 .HasColumnType("int(11)")
@@ -107,6 +115,11 @@ public partial class SasipcaContext : DbContext
                 .HasForeignKey(d => d.AddressId)
                 .OnDelete(DeleteBehavior.SetNull)
                 .HasConstraintName("FK_beneficiaries_beneficiary_address");
+
+            entity.HasOne(d => d.CreatedByNavigation).WithMany(p => p.Beneficiaries)
+                .HasForeignKey(d => d.CreatedBy)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_beneficiaries_users");
         });
 
         modelBuilder.Entity<BeneficiaryAddress>(entity =>
@@ -224,6 +237,7 @@ public partial class SasipcaContext : DbContext
                 .HasColumnType("int(11)")
                 .HasColumnName("status_id");
             entity.Property(e => e.UpdatedAt)
+                .ValueGeneratedOnAddOrUpdate()
                 .HasColumnType("datetime")
                 .HasColumnName("updated_at");
             entity.Property(e => e.UserId)
@@ -350,9 +364,9 @@ public partial class SasipcaContext : DbContext
 
             entity.ToTable("movement_items");
 
-            entity.HasIndex(e => e.MovementId, "movement_items_fk1");
+            entity.HasIndex(e => e.MovementId, "FK_mov_id");
 
-            entity.HasIndex(e => e.ProductLotId, "movement_items_fk2");
+            entity.HasIndex(e => e.ProductLotId, "FK_prod_lot_id");
 
             entity.Property(e => e.Id)
                 .HasColumnType("int(11)")
@@ -369,13 +383,12 @@ public partial class SasipcaContext : DbContext
 
             entity.HasOne(d => d.Movement).WithMany(p => p.MovementItems)
                 .HasForeignKey(d => d.MovementId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("movement_items_fk1");
+                .HasConstraintName("FK_mov_id");
 
             entity.HasOne(d => d.ProductLot).WithMany(p => p.MovementItems)
                 .HasForeignKey(d => d.ProductLotId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("movement_items_fk2");
+                .HasConstraintName("FK_prod_lot_id");
         });
 
         modelBuilder.Entity<MovementType>(entity =>
@@ -398,7 +411,9 @@ public partial class SasipcaContext : DbContext
 
             entity.ToTable("notifications");
 
-            entity.HasIndex(e => e.StatusId, "status_id");
+            entity.HasIndex(e => e.UserId, "FK_notifications_users");
+
+            entity.HasIndex(e => e.StatusId, "notifications_ibfk_1");
 
             entity.Property(e => e.Id)
                 .HasColumnType("int(11)")
@@ -423,6 +438,10 @@ public partial class SasipcaContext : DbContext
                 .HasForeignKey(d => d.StatusId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("notifications_ibfk_1");
+
+            entity.HasOne(d => d.User).WithMany(p => p.Notifications)
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("FK_notifications_users");
         });
 
         modelBuilder.Entity<NotificationStatus>(entity =>
@@ -512,7 +531,6 @@ public partial class SasipcaContext : DbContext
             entity.HasIndex(e => new { e.Barcode, e.Lot }, "barcode").IsUnique();
 
             entity.Property(e => e.Id)
-                .ValueGeneratedNever()
                 .HasColumnType("int(11)")
                 .HasColumnName("id");
             entity.Property(e => e.Barcode).HasColumnName("barcode");
@@ -524,8 +542,7 @@ public partial class SasipcaContext : DbContext
 
             entity.HasOne(d => d.BarcodeNavigation).WithMany(p => p.ProductLots)
                 .HasForeignKey(d => d.Barcode)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("product_lot_fk1");
+                .HasConstraintName("FK_barcode");
         });
 
         modelBuilder.Entity<TokenResetPassword>(entity =>
@@ -600,6 +617,108 @@ public partial class SasipcaContext : DbContext
                 .ValueGeneratedOnAddOrUpdate()
                 .HasColumnType("datetime")
                 .HasColumnName("updated_at");
+        });
+
+        modelBuilder.Entity<VDelivery>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToView("v_deliveries");
+
+            entity.Property(e => e.BeneficiaryId).HasColumnType("int(11)");
+            entity.Property(e => e.BeneficiaryName).HasMaxLength(50);
+            entity.Property(e => e.DeliveryId).HasColumnType("int(11)");
+            entity.Property(e => e.Note).HasColumnType("text");
+            entity.Property(e => e.ScheduledDate).HasColumnType("datetime");
+            entity.Property(e => e.Status).HasMaxLength(255);
+            entity.Property(e => e.UserId).HasColumnType("int(11)");
+            entity.Property(e => e.UserName).HasMaxLength(255);
+        });
+
+        modelBuilder.Entity<VMovHistory>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToView("v_mov_history");
+
+            entity.Property(e => e.DeliveryId)
+                .HasColumnType("int(11)")
+                .HasColumnName("delivery_id");
+            entity.Property(e => e.MovementDate)
+                .HasDefaultValueSql("current_timestamp()")
+                .HasColumnType("datetime")
+                .HasColumnName("movement_date");
+            entity.Property(e => e.MovementId)
+                .HasColumnType("int(11)")
+                .HasColumnName("movement_id");
+            entity.Property(e => e.MovementNote)
+                .HasColumnType("text")
+                .HasColumnName("movement_note");
+            entity.Property(e => e.MovementType)
+                .HasMaxLength(255)
+                .HasColumnName("movement_type");
+            entity.Property(e => e.TotalQuantityAffected)
+                .HasPrecision(32)
+                .HasColumnName("total_quantity_affected");
+            entity.Property(e => e.UserId)
+                .HasColumnType("int(11)")
+                .HasColumnName("user_id");
+            entity.Property(e => e.UserName)
+                .HasMaxLength(255)
+                .HasColumnName("user_name");
+        });
+
+        modelBuilder.Entity<VMovHistoryDetail>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToView("v_mov_history_details");
+
+            entity.Property(e => e.BeneficiaryId)
+                .HasDefaultValueSql("'0'")
+                .HasColumnType("int(11)")
+                .HasColumnName("beneficiary_id");
+            entity.Property(e => e.BeneficiaryName)
+                .HasMaxLength(50)
+                .HasColumnName("beneficiary_name");
+            entity.Property(e => e.DeliveryId)
+                .HasColumnType("int(11)")
+                .HasColumnName("delivery_id");
+            entity.Property(e => e.DeliveryScheduledDate)
+                .HasColumnType("datetime")
+                .HasColumnName("delivery_scheduled_date");
+            entity.Property(e => e.ItemQuantityAffected)
+                .HasColumnType("int(11)")
+                .HasColumnName("item_quantity_affected");
+            entity.Property(e => e.LotExpiryDate).HasColumnName("lot_expiry_date");
+            entity.Property(e => e.MovementDate)
+                .HasDefaultValueSql("current_timestamp()")
+                .HasColumnType("datetime")
+                .HasColumnName("movement_date");
+            entity.Property(e => e.MovementId)
+                .HasColumnType("int(11)")
+                .HasColumnName("movement_id");
+            entity.Property(e => e.MovementNote)
+                .HasColumnType("text")
+                .HasColumnName("movement_note");
+            entity.Property(e => e.MovementType)
+                .HasMaxLength(255)
+                .HasColumnName("movement_type");
+            entity.Property(e => e.ProductBarcode)
+                .HasMaxLength(255)
+                .HasColumnName("product_barcode");
+            entity.Property(e => e.ProductLotNumber)
+                .HasMaxLength(255)
+                .HasColumnName("product_lot_number");
+            entity.Property(e => e.ProductName)
+                .HasMaxLength(255)
+                .HasColumnName("product_name");
+            entity.Property(e => e.UserId)
+                .HasColumnType("int(11)")
+                .HasColumnName("user_id");
+            entity.Property(e => e.UserName)
+                .HasMaxLength(255)
+                .HasColumnName("user_name");
         });
 
         modelBuilder.Entity<VStockPerLot>(entity =>
