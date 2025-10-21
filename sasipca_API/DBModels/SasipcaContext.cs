@@ -41,6 +41,10 @@ public partial class SasipcaContext : DbContext
 
     public virtual DbSet<ProductLot> ProductLots { get; set; }
 
+    public virtual DbSet<Report> Reports { get; set; }
+
+    public virtual DbSet<ReportType> ReportTypes { get; set; }
+
     public virtual DbSet<TokenResetPassword> TokenResetPasswords { get; set; }
 
     public virtual DbSet<UnitType> UnitTypes { get; set; }
@@ -106,6 +110,12 @@ public partial class SasipcaContext : DbContext
             entity.Property(e => e.Name)
                 .HasMaxLength(50)
                 .HasColumnName("name");
+            entity.Property(e => e.Nif)
+                .HasColumnType("int(9)")
+                .HasColumnName("nif");
+            entity.Property(e => e.StudentNum)
+                .HasColumnType("int(10)")
+                .HasColumnName("student_num");
             entity.Property(e => e.UpdatedAt)
                 .ValueGeneratedOnAddOrUpdate()
                 .HasColumnType("datetime")
@@ -230,9 +240,7 @@ public partial class SasipcaContext : DbContext
             entity.Property(e => e.Note)
                 .HasColumnType("text")
                 .HasColumnName("note");
-            entity.Property(e => e.ScheduledDate)
-                .HasColumnType("datetime")
-                .HasColumnName("scheduled_date");
+            entity.Property(e => e.ScheduledDate).HasColumnName("scheduled_date");
             entity.Property(e => e.StatusId)
                 .HasColumnType("int(11)")
                 .HasColumnName("status_id");
@@ -545,6 +553,58 @@ public partial class SasipcaContext : DbContext
                 .HasConstraintName("FK_barcode");
         });
 
+        modelBuilder.Entity<Report>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity.ToTable("reports");
+
+            entity.HasIndex(e => e.ReportType, "FK_reports_report_types");
+
+            entity.HasIndex(e => e.CreatorId, "FK_reports_users");
+
+            entity.Property(e => e.Id)
+                .HasColumnType("int(11)")
+                .HasColumnName("id");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("current_timestamp()")
+                .HasColumnType("datetime")
+                .HasColumnName("created_at");
+            entity.Property(e => e.CreatorId)
+                .HasColumnType("int(11)")
+                .HasColumnName("creator_id");
+            entity.Property(e => e.Name)
+                .HasMaxLength(150)
+                .HasColumnName("name");
+            entity.Property(e => e.ReportType)
+                .HasColumnType("int(11)")
+                .HasColumnName("report_type");
+
+            entity.HasOne(d => d.Creator).WithMany(p => p.Reports)
+                .HasForeignKey(d => d.CreatorId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_reports_users");
+
+            entity.HasOne(d => d.ReportTypeNavigation).WithMany(p => p.Reports)
+                .HasForeignKey(d => d.ReportType)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_reports_report_types");
+        });
+
+        modelBuilder.Entity<ReportType>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity.ToTable("report_types");
+
+            entity.Property(e => e.Id)
+                .HasColumnType("int(11)")
+                .HasColumnName("id");
+            entity.Property(e => e.Type)
+                .HasMaxLength(50)
+                .HasColumnName("type");
+        });
+
         modelBuilder.Entity<TokenResetPassword>(entity =>
         {
             entity.HasKey(e => e.UserId).HasName("PRIMARY");
@@ -629,7 +689,6 @@ public partial class SasipcaContext : DbContext
             entity.Property(e => e.BeneficiaryName).HasMaxLength(50);
             entity.Property(e => e.DeliveryId).HasColumnType("int(11)");
             entity.Property(e => e.Note).HasColumnType("text");
-            entity.Property(e => e.ScheduledDate).HasColumnType("datetime");
             entity.Property(e => e.Status).HasMaxLength(255);
             entity.Property(e => e.UserId).HasColumnType("int(11)");
             entity.Property(e => e.UserName).HasMaxLength(255);
@@ -684,9 +743,7 @@ public partial class SasipcaContext : DbContext
             entity.Property(e => e.DeliveryId)
                 .HasColumnType("int(11)")
                 .HasColumnName("delivery_id");
-            entity.Property(e => e.DeliveryScheduledDate)
-                .HasColumnType("datetime")
-                .HasColumnName("delivery_scheduled_date");
+            entity.Property(e => e.DeliveryScheduledDate).HasColumnName("delivery_scheduled_date");
             entity.Property(e => e.ItemQuantityAffected)
                 .HasColumnType("int(11)")
                 .HasColumnName("item_quantity_affected");

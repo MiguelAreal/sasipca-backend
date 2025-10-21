@@ -41,13 +41,12 @@ namespace sasipca_API.Services
         private async Task<(bool success, Resposta? response)> ProcessDeliveryItems(
             Delivery delivery,
             List<DeliveryItemDTO> itemDtos,
-            DateTime scheduledDate,
+            DateOnly scheduledDate,
             Movement? newMovement,
             List<ProductLot> lotsToUpdate)
         {
             var isDeductingStock = newMovement != null;
             var isScheduling = delivery.StatusId == (int)Enums.DeliveryStatus.Agendada;
-            var scheduledDateOnly = DateOnly.FromDateTime(scheduledDate);
 
             foreach (var itemDto in itemDtos)
             {
@@ -65,9 +64,9 @@ namespace sasipca_API.Services
                 if (isScheduling)
                 {
                     // Bloquear se a data de validade for ANTES ou NO DIA da entrega agendada.
-                    if (productLot.ExpiryDate <= scheduledDateOnly)
+                    if (productLot.ExpiryDate <= scheduledDate)
                     {
-                        return (false, new Resposta($"Agendamento bloqueado. O produto '{productLot.BarcodeNavigation.Name}' (Lote: {itemDto.Lot}, Válido até: {productLot.ExpiryDate:yyyy-MM-dd}) expira antes ou no dia ({scheduledDateOnly:yyyy-MM-dd}) da entrega agendada."));
+                        return (false, new Resposta($"Agendamento bloqueado. O produto '{productLot.BarcodeNavigation.Name}' (Lote: {itemDto.Lot}, Válido até: {productLot.ExpiryDate:yyyy-MM-dd}) expira antes ou no dia ({scheduledDate:yyyy-MM-dd}) da entrega agendada."));
                     }
                 }
 
@@ -270,7 +269,7 @@ namespace sasipca_API.Services
                     var (success, result) = await ProcessDeliveryItems(
                         delivery,
                         dto.ItemsToDeliver,
-                        newScheduledDate, // Usar a nova (ou antiga) data
+                        newScheduledDate,
                         newMovement,
                         lotsToUpdate);
 

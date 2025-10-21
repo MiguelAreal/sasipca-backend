@@ -84,5 +84,29 @@
             AjusteInventario = 3,
         }
 
+        // Para reports.
+        public enum ReportTypesEnum
+        {
+            /// <summary>
+            /// Report para cabeçalhos de movimentos.
+            /// </summary>
+            MovementHeaders = 1,
+            /// <summary>
+            /// Report para detalhes de um movimento específico.
+            /// </summary>
+            MovementDetails = 2,
+            /// <summary>
+            /// Report para cabeçalhos de entregas.
+            /// </summary>
+            DeliveryHeaders = 3
+        }
+
+        // Formatos de Saída
+        public enum ReportFormat
+        {
+            PDF = 1,
+            CSV = 2
+        }
+
     }
 }

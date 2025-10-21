@@ -1,26 +1,27 @@
+using DotNetEnv;
+using Hangfire;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebSockets;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Renci.SshNet;
+using sasipca_API.DBModels;
+using sasipca_API.Hubs;
+using sasipca_API.Middleware;
 using sasipca_API.Models;
 using sasipca_API.Services;
-using System.Text;
-using DotNetEnv;
-using System.Reflection;
-using Hangfire;
-using sasipca_API.Middleware;
-using System.Threading.RateLimiting;
-using Microsoft.AspNetCore.Mvc;
-using System.Text.Json;
-using System.Globalization;
-using System.Text.Encodings.Web;
-using System.Text.Unicode;
-using Microsoft.AspNetCore.WebSockets;
-using sasipca_API.Hubs;
 using sasipca_API.Services.Interfaces;
-using sasipca_API.DBModels;
-using Renci.SshNet;
-
+using System.Globalization;
+using System.Reflection;
+using System.Text;
+using System.Text.Encodings.Web;
+using System.Text.Json;
+using System.Text.Unicode;
+using System.Threading.RateLimiting;
+using WkHtmlToPdfDotNet;
+using WkHtmlToPdfDotNet.Contracts;
 namespace sasipca_API
 {
     public class Program
@@ -31,6 +32,7 @@ namespace sasipca_API
             Console.OutputEncoding = Encoding.UTF8;
             CultureInfo.DefaultThreadCurrentCulture = new CultureInfo("pt-PT");
             CultureInfo.DefaultThreadCurrentUICulture = new CultureInfo("pt-PT");
+
 
             Env.Load();
             // Busca variáveis de ambiente de Base de dados e JWT
@@ -79,9 +81,13 @@ namespace sasipca_API
             builder.Services.AddScoped<IProductService, ProductService>();
             builder.Services.AddScoped<IBeneficiaryService, BeneficiaryService>();
             builder.Services.AddScoped<IDeliveryService, DeliveryService>();
+            builder.Services.AddScoped<IReportingService, ReportingService>();
+            builder.Services.AddScoped<ITemplateGeneratorService, TemplateGeneratorService>();
             builder.Services.AddScoped<IJWTService, JWTService>();
             builder.Services.AddTransient<IEmailService, EmailService>();
 
+
+            builder.Services.AddSingleton<IConverter, SynchronizedConverter>(provider => new SynchronizedConverter(new PdfTools()));
 
             //Adicionar Serviço de WebSocket
             builder.Services.AddWebSockets(options => {

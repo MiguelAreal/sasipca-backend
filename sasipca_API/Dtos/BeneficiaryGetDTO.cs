@@ -13,7 +13,8 @@ namespace sasipca_API.Dtos
         public string Email { get; set; }
         public string Contact { get; set; }
         public string Course { get; set; }
-        public int CurricularYear { get; set; }
-
+        public int? CurricularYear { get; set; }
+        public int? StudentNum { get; set; }
+        public int? Nif { get; set; }
     }
 }

@@ -29,7 +29,7 @@ public partial class VMovHistoryDetail
 
     public int? DeliveryId { get; set; }
 
-    public DateTime? DeliveryScheduledDate { get; set; }
+    public DateOnly? DeliveryScheduledDate { get; set; }
 
     public int? BeneficiaryId { get; set; }
 

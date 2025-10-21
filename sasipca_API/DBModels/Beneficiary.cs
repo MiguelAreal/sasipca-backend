@@ -13,9 +13,13 @@ public partial class Beneficiary
 
     public string Contact { get; set; } = null!;
 
-    public string Course { get; set; } = null!;
+    public string? Course { get; set; }
 
-    public int CurricularYear { get; set; }
+    public int? CurricularYear { get; set; }
+
+    public int? Nif { get; set; }
+
+    public int? StudentNum { get; set; }
 
     public int? AddressId { get; set; }
 

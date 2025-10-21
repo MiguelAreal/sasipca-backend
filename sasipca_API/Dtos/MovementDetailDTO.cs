@@ -17,7 +17,7 @@
 
         // Entrega (Saída)
         public int? DeliveryId { get; set; }
-        public DateTime? DeliveryScheduledDate { get; set; }
+        public DateOnly? DeliveryScheduledDate { get; set; }
         public int? BeneficiaryId { get; set; }
         public string? BeneficiaryName { get; set; }
 

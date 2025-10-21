@@ -11,7 +11,7 @@ namespace sasipca_API.Dtos
         /// <summary>
         /// A nova data em que a entrega está agendada.
         /// </summary>
-        public DateTime? ScheduledDate { get; set; }
+        public DateOnly? ScheduledDate { get; set; }
 
         /// <summary>
         /// O novo status da entrega (1: Agendada, 2: Entregue, 3: Cancelada).

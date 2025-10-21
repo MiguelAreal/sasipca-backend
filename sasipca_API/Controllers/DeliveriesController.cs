@@ -52,7 +52,7 @@ namespace sasipca_API.Controllers
             var userId = (int)HttpContext.Items["UserId"];
 
             // 2. Validação da Data (Saída imediata: deve ser hoje ou passado)
-            if (dto.ScheduledDate.Date > DateTime.Today)
+            if (dto.ScheduledDate > DateOnly.FromDateTime(DateTime.Today))
             {
                 return BadRequest(new Resposta("Para uma saída imediata, a ScheduledDate deve ser hoje ou uma data passada."));
             }
@@ -99,7 +99,7 @@ namespace sasipca_API.Controllers
             }
 
             // 2. Validação da Data (Agendamento: deve ser futura)
-            if (dto.ScheduledDate.Date < DateTime.Today)
+            if (dto.ScheduledDate < DateOnly.FromDateTime(DateTime.Today))
             {
                 return BadRequest(new Resposta("Para agendar uma entrega, a ScheduledDate deve ser uma data futura."));
             }
@@ -196,12 +196,12 @@ namespace sasipca_API.Controllers
 
             if (query.DateFrom.HasValue)
             {
-                deliveriesQuery = deliveriesQuery.Where(d => d.ScheduledDate.Date >= query.DateFrom.Value.Date);
+                deliveriesQuery = deliveriesQuery.Where(d => d.ScheduledDate >= DateOnly.FromDateTime(query.DateFrom.Value));
             }
 
             if (query.DateTo.HasValue)
             {
-                deliveriesQuery = deliveriesQuery.Where(d => d.ScheduledDate.Date <= query.DateTo.Value.Date);
+                deliveriesQuery = deliveriesQuery.Where(d => d.ScheduledDate <= DateOnly.FromDateTime(query.DateTo.Value));
             }
 
             // 2. Execução da Query

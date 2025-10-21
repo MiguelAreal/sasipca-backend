@@ -1,0 +1,11 @@
+ID Movimento;Data;Tipo;Utilizador;Nota;Quantidade Total Afetada
+13;2025-10-20 19:19;Ajuste de Inventário;teste;fodase;-5
+12;2025-10-20 19:19;Ajuste de Inventário;teste;fodase;5
+11;2025-10-20 19:18;Saída;teste;IMEDIATO;-5
+14;2025-10-20 18:40;Entrada;teste;Entrada de stock (receção).;5
+10;2025-10-20 18:13;Entrada;teste;entrada de 10 garrafas doado pelo continente;10
+9;2025-10-20 14:48;Ajuste de Inventário;teste;8 embora;-8
+8;2025-10-20 14:48;Ajuste de Inventário;teste;Afinal tinha 5 escondidos;5
+7;2025-10-20 13:21;Entrada;teste;string;25
+6;2025-10-20 11:29;Saída;teste;Este jovem pediu 3 kg de nutella;-3
+5;2025-10-20 11:28;Entrada;teste;Pote de nutella cada com 1 kg;5

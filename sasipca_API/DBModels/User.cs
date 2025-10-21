@@ -35,5 +35,7 @@ public partial class User
 
     public virtual ICollection<ParticularOb> ParticularObs { get; set; } = new List<ParticularOb>();
 
+    public virtual ICollection<Report> Reports { get; set; } = new List<Report>();
+
     public virtual TokenResetPassword? TokenResetPassword { get; set; }
 }

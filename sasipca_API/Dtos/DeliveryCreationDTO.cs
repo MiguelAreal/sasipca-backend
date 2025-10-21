@@ -17,7 +17,7 @@ namespace sasipca_API.Dtos
         /// Se a data for hoje ou passada, a entrega será marcada como 'Entregue' imediatamente, deduzindo o stock.
         /// </summary>
         [Required(ErrorMessage = "A data agendada é obrigatória.")]
-        public DateTime ScheduledDate { get; set; }
+        public DateOnly ScheduledDate { get; set; }
 
         /// <summary>
         /// Notas ou observações sobre a entrega (opcional).

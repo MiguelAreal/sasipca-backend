@@ -14,7 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Remove="Templates\ForgotPasswordTemplate.html" />
+    <None Remove="ReportTemplates\ForgotPasswordTemplate.html" />
   </ItemGroup>
 
   <ItemGroup>
@@ -23,6 +23,7 @@
     <PackageReference Include="DotNetEnv" Version="3.1.1" />
     <PackageReference Include="FluentAssertions" Version="8.7.1" />
     <PackageReference Include="Hangfire" Version="1.8.21" />
+    <PackageReference Include="Haukcode.WkHtmlToPdfDotNet" Version="1.5.95" />
     <PackageReference Include="JWT" Version="11.0.0" />
     <PackageReference Include="MailKit" Version="4.14.1" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.10" />
@@ -40,16 +41,18 @@
     <PackageReference Include="MimeKit" Version="4.14.0" />
     <PackageReference Include="Moq" Version="4.20.72" />
     <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="9.0.0" />
+    <PackageReference Include="QuestPDF" Version="2025.7.3" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
     <PackageReference Include="SSH.NET" Version="2025.0.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.6" />
     <PackageReference Include="Swashbuckle.AspNetCore.Annotations" Version="9.0.6" />
     <PackageReference Include="System.Net.WebSockets" Version="4.3.0" />
+    <PackageReference Include="WkHtmlToXSharp" Version="1.2.36" />
     <PackageReference Include="xunit" Version="2.9.3" />
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Templates\ForgotPasswordTemplate.html">
+    <Content Include="ReportTemplates\ForgotPasswordTemplate.html">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

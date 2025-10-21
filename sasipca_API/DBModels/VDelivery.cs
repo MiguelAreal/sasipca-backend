@@ -7,7 +7,7 @@ public partial class VDelivery
 {
     public int DeliveryId { get; set; }
 
-    public DateTime ScheduledDate { get; set; }
+    public DateOnly ScheduledDate { get; set; }
 
     public string Status { get; set; } = null!;
 

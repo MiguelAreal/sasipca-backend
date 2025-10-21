@@ -278,8 +278,10 @@ namespace sasipca_API.Controllers
                        Name = p.Name,
                        Email = p.Email,
                        Contact = p.Contact,
+                       Nif = p.Nif,
                        Course = p.Course,
                        CurricularYear = p.CurricularYear,
+                       StudentNum = p.StudentNum
                     })
                         .FirstOrDefaultAsync();
 
@@ -296,12 +298,5 @@ namespace sasipca_API.Controllers
         }
 
 
-
-
-        #region Métodos Auxiliares Privados
-
-      
-
-        #endregion
     }
 }

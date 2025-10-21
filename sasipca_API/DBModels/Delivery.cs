@@ -15,7 +15,7 @@ public partial class Delivery
 
     public string? Note { get; set; }
 
-    public DateTime ScheduledDate { get; set; }
+    public DateOnly ScheduledDate { get; set; }
 
     public DateTime CreatedAt { get; set; }
 
