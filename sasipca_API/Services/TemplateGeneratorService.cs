@@ -16,11 +16,9 @@ namespace sasipca_API.Services
 
         public TemplateGeneratorService()
         {
-            // O caminho base é onde está o template e o CSS
             _basePath = Path.Combine(Directory.GetCurrentDirectory(), "ReportTemplates");
         }
 
-        // CORREÇÃO CS0535: Implementa a interface usando o novo nome do Enum (ReportTypesEnum)
         public string GenerateReportHtml<T>(T data, ReportTypesEnum type, ReportRequestDTO request, string reportTypeName)
         {
             // 1. Carregar Template Base e CSS
@@ -30,7 +28,7 @@ namespace sasipca_API.Services
             string htmlTemplate = File.ReadAllText(templatePath, Encoding.UTF8);
 
             // Obter filtros
-            var filters = request.Filters as DateAndDeliveryFiltersDTO;
+            var filters = request.Filters as ReportFiltersDTO;
 
             // --- 2. Gerar Conteúdo Condicional ---
             string dynamicContent = GenerateDynamicReportBody(data, type, filters);
@@ -44,7 +42,7 @@ namespace sasipca_API.Services
             return htmlTemplate.Replace("{report_content}", dynamicContent);
         }
 
-        private string GenerateDynamicReportBody<T>(T data, ReportTypesEnum type, DateAndDeliveryFiltersDTO? filters)
+        private string GenerateDynamicReportBody<T>(T data, ReportTypesEnum type, ReportFiltersDTO? filters)
         {
             var sb = new StringBuilder();
 
@@ -56,10 +54,9 @@ namespace sasipca_API.Services
             string dateTo = filters?.DateTo?.ToString("dd-MM-yyyy") ?? "Todos";
             sb.AppendLine($"<p>Período: <strong>{dateFrom}</strong> a <strong>{dateTo}</strong></p>");
 
-            // Lógica de filtros específicos (DeliveryHeaders)
-            if (type == ReportTypesEnum.DeliveryHeaders) // <<-- CORRIGIDO
+            if (type == ReportTypesEnum.DeliveryHeaders)
             {
-                string status = filters?.StatusId?.ToString() ?? "Todos";
+                string status = filters?.DeliveryStatus?.ToString() ?? "Todos";
                 string beneficiary = filters?.BeneficiaryId?.ToString() ?? "Todos";
                 sb.AppendLine($"<p>Status: <strong>{status}</strong> | Beneficiário ID: <strong>{beneficiary}</strong></p>");
             }

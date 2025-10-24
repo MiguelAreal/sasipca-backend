@@ -6,15 +6,14 @@ using sasipca_API.Models;
 using sasipca_API.Services.Interfaces;
 using System;
 using System.Collections.Generic;
-using System.IO; // Necessário para salvar o arquivo
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using WkHtmlToPdfDotNet;
-using WkHtmlToPdfDotNet.Contracts; // IConverter está aqui
-using WkHtmlToXSharp; // Tipos de configuração WkHtmlToPdf
 using static sasipca_API.Dtos.ReportRequestDTO;
 using static sasipca_API.Enumerators.Enums;
+using WkHtmlToPdfDotNet.Contracts;
+using WkHtmlToPdfDotNet;
+using System.IO;
 
 namespace sasipca_API.Services
 {
@@ -25,7 +24,7 @@ namespace sasipca_API.Services
     {
         private readonly SasipcaContext _dbContext;
         private readonly ITemplateGeneratorService _templateGeneratorService;
-        private readonly IConverter _pdfConverter; // Tipo correto para WkHtmlToPdfDotNet
+        private readonly IConverter _pdfConverter;
 
         public ReportingService(SasipcaContext dbContext, ITemplateGeneratorService templateGeneratorService, IConverter pdfConverter)
         {
@@ -42,14 +41,11 @@ namespace sasipca_API.Services
             string reportTypeName;
             try
             {
-                // O ReportType aqui é o ID (int) do Enum C#
                 int reportTypeId = (int)request.Type;
-
-                // Buscar o nome na tabela ReportTypes
                 reportTypeName = await _dbContext.ReportTypes
                     .Where(rt => rt.Id == reportTypeId)
-                    .Select(rt => rt.Type) // Pega o nome descritivo (ex: "Histórico de Movimentos")
-                    .FirstOrDefaultAsync() ?? request.Type.ToString(); // Fallback para o nome do Enum se não encontrar
+                    .Select(rt => rt.Type)
+                    .FirstOrDefaultAsync() ?? request.Type.ToString();
             }
             catch
             {
@@ -65,7 +61,6 @@ namespace sasipca_API.Services
 
             if (data == null || (data is IEnumerable<object> enumerable && !enumerable.Any()))
             {
-                // Retorna 0 para o ReportId se não houver dados
                 return (Array.Empty<byte>(), "application/octet-stream", finalFileName, 0);
             }
 
@@ -74,19 +69,18 @@ namespace sasipca_API.Services
 
             if (request.Format == ReportFormat.CSV)
             {
-                fileContent = GenerateCsvContent(data, request.Type);
+                fileContent = GenerateCsvContent(data, (ReportTypesEnum)request.Type);
                 mimeType = "text/csv";
             }
             else // PDF
             {
-                fileContent = GeneratePdfContent(data, request.Type, request,reportTypeName);
+                fileContent = GeneratePdfContent(data, (ReportTypesEnum)request.Type, request, reportTypeName);
                 mimeType = "application/pdf";
             }
 
             // --- NOVO PASSO: GUARDAR NO DISCO E NA BASE DE DADOS ---
 
-            // 1. Guardar no Disco (Ajuste o caminho conforme necessário)
-            // Criar a pasta 'Reports' se não existir
+            // 1. Guardar no Disco
             var reportsDirectory = Path.Combine(Directory.GetCurrentDirectory(), "Reports");
             if (!Directory.Exists(reportsDirectory))
             {
@@ -98,9 +92,9 @@ namespace sasipca_API.Services
             // 2. Guardar na Base de Dados
             var reportEntry = new Report
             {
-                Name = finalFileName, // Nome base do relatório
+                Name = finalFileName,
                 CreatorId = creatorId,
-                ReportType = (int)request.Type // Mapeia o Enum Type para o ReportType ID na BD
+                ReportType = (int)request.Type
             };
 
             _dbContext.Reports.Add(reportEntry);
@@ -112,20 +106,17 @@ namespace sasipca_API.Services
 
 
         // --------------------------------------------------------------------
-        // NOVO MÉTODO: LISTAGEM DE RELATÓRIOS GERADOS
+        // NOVO MÉTODO: LISTAGEM DE RELATÓRIOS GERADOS (Mantido)
         // --------------------------------------------------------------------
         public async Task<IEnumerable<ReportGetDTO>> GetGeneratedReportsMetadataAsync(int? reportTypeId = null)
         {
             var query = _dbContext.Reports.AsQueryable();
 
-            // APLICAÇÃO DA FILTRAGEM
             if (reportTypeId.HasValue && reportTypeId.Value > 0)
             {
-                // Se um ID for fornecido, filtra pela coluna ReportType (que armazena o ID inteiro)
                 query = query.Where(r => r.ReportType == reportTypeId.Value);
             }
 
-            // Consulta EF Core com JOINs implícitos (usando a propriedade de navegação)
             var reports = await query
                 .Include(r => r.Creator)
                 .Include(r => r.ReportTypeNavigation)
@@ -145,11 +136,10 @@ namespace sasipca_API.Services
         }
 
         // --------------------------------------------------------------------
-        // NOVO MÉTODO: OBTER ARQUIVO DO DISCO
+        // NOVO MÉTODO: OBTER ARQUIVO DO DISCO (Mantido)
         // --------------------------------------------------------------------
         public async Task<(byte[] fileContent, string mimeType, string fileName)> GetReportFileAsync(int reportId)
         {
-            // 1. Obter metadados do relatório
             var reportEntry = await _dbContext.Reports.FindAsync(reportId);
 
             if (reportEntry == null)
@@ -157,20 +147,16 @@ namespace sasipca_API.Services
                 throw new KeyNotFoundException($"Relatório com ID {reportId} não encontrado na base de dados.");
             }
 
-            // 2. Determinar o MIME Type e o Caminho do Arquivo
-            var fileName = reportEntry.Name; // Assumimos que o Name armazena o nome COMPLETO do arquivo (com extensão)
+            var fileName = reportEntry.Name;
             var reportsDirectory = Path.Combine(Directory.GetCurrentDirectory(), "Reports");
             var filePath = Path.Combine(reportsDirectory, fileName);
 
-            // Determinar o MIME Type
             var mimeType = fileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)
                            ? "application/pdf"
                            : "text/csv";
 
-            // 3. Ler o arquivo do disco
             if (!File.Exists(filePath))
             {
-                // NOTA: Em um sistema de produção, você pode querer marcar o registro como "arquivo perdido"
                 throw new FileNotFoundException($"O ficheiro de relatório '{fileName}' não foi encontrado no disco.");
             }
 
@@ -180,11 +166,13 @@ namespace sasipca_API.Services
         }
 
         // --------------------------------------------------------------------
-        // FUNÇÕES DE OBTENÇÃO E FILTRAGEM DE DADOS (Mantidas)
+        // FUNÇÕES DE OBTENÇÃO E FILTRAGEM DE DADOS
         // --------------------------------------------------------------------
         private async Task<object> GetFilteredDataAsync(ReportRequestDTO request)
         {
-            var filtersToUse = request.Filters as DateAndDeliveryFiltersDTO ?? new DateAndDeliveryFiltersDTO();
+            // O DTO ReportFiltersDTO é o DTO correto para filtros de data
+            var filtersToUse = request.Filters ?? new ReportFiltersDTO();
+
             switch (request.Type)
             {
                 case ReportTypesEnum.MovementHeaders:
@@ -200,20 +188,20 @@ namespace sasipca_API.Services
             }
         }
 
-        private async Task<List<VMovHistory>> GetMovementHeadersAsync(DateAndDeliveryFiltersDTO filters)
+        private async Task<List<VMovHistory>> GetMovementHeadersAsync(ReportFiltersDTO filters)
         {
             var query = _dbContext.VMovHistories.AsQueryable();
 
             if (filters.DateFrom.HasValue)
             {
-                // 1. Converter DateOnly para DateTime, começando EXATAMENTE às 00:00:00
+                // CORREÇÃO: Conversão de DateOnly para o início do dia (00:00:00)
                 var dateTimeFrom = filters.DateFrom.Value.ToDateTime(TimeOnly.MinValue);
                 query = query.Where(h => h.MovementDate >= dateTimeFrom);
             }
 
             if (filters.DateTo.HasValue)
             {
-                // 2. Converter DateOnly para DateTime, terminando no ÚLTIMO TICK do dia
+                // CORREÇÃO: Conversão de DateOnly para o FIM do dia (23:59:59.999...)
                 var dateTimeTo = filters.DateTo.Value.ToDateTime(TimeOnly.MaxValue);
                 query = query.Where(h => h.MovementDate <= dateTimeTo);
             }
@@ -229,12 +217,12 @@ namespace sasipca_API.Services
                 .ToListAsync();
         }
 
-        private async Task<List<VDelivery>> GetDeliveryHeadersAsync(DateAndDeliveryFiltersDTO filters)
+        private async Task<List<VDelivery>> GetDeliveryHeadersAsync(ReportFiltersDTO filters)
         {
             var query = _dbContext.Set<VDelivery>().AsQueryable();
 
-            if (filters.StatusId.HasValue)
-                query = query.Where(d => d.Status == filters.StatusId.Value.ToString());
+            if (filters.DeliveryStatus.HasValue)
+                query = query.Where(d => d.Status == filters.DeliveryStatus.Value.ToString());
 
             if (filters.BeneficiaryId.HasValue)
                 query = query.Where(d => d.BeneficiaryId == filters.BeneficiaryId.Value);
@@ -282,13 +270,15 @@ namespace sasipca_API.Services
         }
 
         // --------------------------------------------------------------------
-        // NOVO MÉTODO: GERAÇÃO DE PDF (HTML para PDF)
+        // GERAÇÃO DE PDF (HTML para PDF) - Lógica de Conversão no topo
         // --------------------------------------------------------------------
         private byte[] GeneratePdfContent(object data, ReportTypesEnum type, ReportRequestDTO request, string reportTypeName)
         {
-            var htmlContent = _templateGeneratorService.GenerateReportHtml((dynamic)data, type, request,reportTypeName);
+            // Chama o TemplateGeneratorService para obter o HTML preenchido
+            // O uso de 'as dynamic' é necessário porque o tipo 'data' é genérico (object)
+            var htmlContent = _templateGeneratorService.GenerateReportHtml((dynamic)data, type, request, reportTypeName);
 
-            // Tipos do WkHtmlToXSharp (WkHtmlToPdfDotNet.Contracts)
+            // Tipos do WkHtmlToPdfDotNet
             var globalSettings = new GlobalSettings
             {
                 ColorMode = ColorMode.Color,
@@ -303,12 +293,9 @@ namespace sasipca_API.Services
                 WebSettings =
                 {
                     DefaultEncoding = "utf-8",
-                    enablePlugins = true,
-                    EnableJavascript = true,
                     LoadImages = true
                 },
                 HeaderSettings = { FontSize = 10, Right = "Página [page] de [toPage]", Line = true },
-               
             };
 
             var pdfDoc = new HtmlToPdfDocument
@@ -317,7 +304,7 @@ namespace sasipca_API.Services
                 Objects = { objectSettings }
             };
 
-            // TIPAGEM CORRETA: O IConverter.Convert aceita HtmlToPdfDocument
+            // O IConverter injetado no construtor realiza a conversão
             return _pdfConverter.Convert(pdfDoc);
         }
     }

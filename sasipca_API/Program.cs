@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebSockets;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Renci.SshNet;
@@ -56,10 +57,6 @@ namespace sasipca_API
             {
                 throw new InvalidOperationException("DB_CONNECTION_KEY is not set in environment variables.");
             }
-            if (string.IsNullOrEmpty(azureStorageKey))
-            {
-                throw new InvalidOperationException("AZURE_STORAGE_KEY is not set in environment variables.");
-            }
 
             // Criar túnel SSH antes de iniciar a app
             var sshClient = new SshClient(sshHost, sshPort, sshUser, sshPassword);
@@ -83,6 +80,7 @@ namespace sasipca_API
             builder.Services.AddScoped<IDeliveryService, DeliveryService>();
             builder.Services.AddScoped<IReportingService, ReportingService>();
             builder.Services.AddScoped<ITemplateGeneratorService, TemplateGeneratorService>();
+            builder.Services.AddScoped<IFileStorageService, FileStorageService>();
             builder.Services.AddScoped<IJWTService, JWTService>();
             builder.Services.AddTransient<IEmailService, EmailService>();
 
@@ -267,9 +265,21 @@ namespace sasipca_API
                     Array.Empty<string>()
                 }});
 
+                options.CustomSchemaIds(type =>
+                {
+                    var name = type.FullName?.Replace("+", ".") ?? type.Name;
+
+                    if (name.StartsWith("sasipca_API."))
+                    {
+                        name = name.Substring("sasipca_API.".Length);
+                    }
+
+                    return name;
+                });
+
             });
 
-
+           
 
             var app = builder.Build();
 
@@ -287,6 +297,18 @@ namespace sasipca_API
                     c.ConfigObject.AdditionalItems["requestCredentials"] = "include";
                 });
             }
+
+            // Definir a pasta raíz de uploads
+            const string StorageRootFolder = "Storage";
+
+            // 1. Mapear a pasta "Storage" para a URL "/static"
+            app.UseStaticFiles(new StaticFileOptions
+            {
+                // O RequestPath define o prefixo URL que o cliente usará (ex: https://api.exemplo.com/static/CampaignImages/imagem.jpg)
+                FileProvider = new PhysicalFileProvider(
+                    Path.Combine(builder.Environment.ContentRootPath, StorageRootFolder)),
+                RequestPath = "/static"
+            });
 
 
             app.UseHttpsRedirection();
