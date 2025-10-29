@@ -106,7 +106,7 @@ namespace sasipca_API.Controllers
                     IsEssential = true
                 });
 
-                return Ok(new AuthResponse(accesstoken,user.Id));
+                return Ok(new AuthResponse(accesstoken,user.Id,user.Name));
             }
             catch (Exception)
             {
@@ -179,7 +179,7 @@ namespace sasipca_API.Controllers
                 var novoAccessToken = _jwtService.GenerateToken(user.Id, user.Email);
                 var novoRefreshToken = await AtualizarRefreshTokenSeProximoExpirar(user);
 
-                return Ok(new AuthResponse(novoAccessToken,user.Id));
+                return Ok(new AuthResponse(novoAccessToken,user.Id,user.Name));
             }
             catch (Exception)
             {

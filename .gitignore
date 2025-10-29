@@ -4,4 +4,4 @@ bin/
 .vs
 .vs/
 obj/
-NeighbourLink_API.tests/obj
+publish/

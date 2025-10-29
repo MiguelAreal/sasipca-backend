@@ -9,14 +9,17 @@
     {
         public int? UserID { get; set; }
         public string Token { get; set; }
+        public string UserName { get; set; }
 
         /// <summary>
         /// Inicialização do objeto AuthResponse
         /// </summary>
         /// <param name="token">Access Token</param>
         /// <param name="userId">ID do user</param>
-        public AuthResponse(string token,int userId)
+        /// <param name="userName">Nome do user</param>
+        public AuthResponse(string token,int userId,string userName)
         {
+            UserName = userName;
             UserID = userId;
             Token = token;
         }
