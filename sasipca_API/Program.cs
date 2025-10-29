@@ -1,6 +1,7 @@
 using DotNetEnv;
 using Hangfire;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebSockets;
 using Microsoft.EntityFrameworkCore;
@@ -59,13 +60,13 @@ namespace sasipca_API
             }
 
             // Criar túnel SSH antes de iniciar a app
-            var sshClient = new SshClient(sshHost, sshPort, sshUser, sshPassword);
+            /*var sshClient = new SshClient(sshHost, sshPort, sshUser, sshPassword);
             sshClient.Connect();
             Console.WriteLine($"SSH conectado a {sshHost}:{sshPort}");
 
             var portForward = new ForwardedPortLocal("127.0.0.1", localPort, "127.0.0.1", 3306);
             sshClient.AddForwardedPort(portForward);
-            portForward.Start();
+            portForward.Start();*/
 
 
             var builder = WebApplication.CreateBuilder(args);
@@ -294,19 +295,32 @@ namespace sasipca_API
                     c.SwaggerEndpoint("/swagger/v1/swagger.json", "sasipca API v1");
 
                     // Permite que o Swagger envie cookies junto com as requisições
-                    c.ConfigObject.AdditionalItems["requestCredentials"] = "include";
+                    c.ConfigObject.AdditionalItems["requestCredentials"] = "inclsude";
                 });
             }
 
             // Definir a pasta raíz de uploads
             const string StorageRootFolder = "Storage";
 
+            // ===================================================================
+            // Verifica e cria a pasta 'Storage' se não existir
+            // ===================================================================
+            string storagePath = Path.Combine(app.Environment.ContentRootPath, StorageRootFolder);
+
+            if (!Directory.Exists(storagePath))
+            {
+                // A lógica para criar o diretorio no sistema de arquivos
+                Directory.CreateDirectory(storagePath);
+                // Opcional: Log para saber que a pasta foi criada
+                Console.WriteLine($"Diretório de armazenamento criado em: {storagePath}");
+            }
+            // ===================================================================
+
             // 1. Mapear a pasta "Storage" para a URL "/static"
             app.UseStaticFiles(new StaticFileOptions
             {
                 // O RequestPath define o prefixo URL que o cliente usará (ex: https://api.exemplo.com/static/CampaignImages/imagem.jpg)
-                FileProvider = new PhysicalFileProvider(
-                    Path.Combine(builder.Environment.ContentRootPath, StorageRootFolder)),
+                FileProvider = new PhysicalFileProvider(storagePath),
                 RequestPath = "/static"
             });
 
@@ -320,9 +334,13 @@ namespace sasipca_API
             app.UseAuthorization();
             app.UseRateLimiter();
             app.MapControllers();
+            app.UseForwardedHeaders(new ForwardedHeadersOptions
+            {
+                ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+            });
 
             // Fecha o túnel SSH quando a app termina
-            app.Lifetime.ApplicationStopping.Register(() =>
+            /*app.Lifetime.ApplicationStopping.Register(() =>
             {
                 try
                 {
@@ -335,7 +353,7 @@ namespace sasipca_API
                 {
                     Console.WriteLine($"Erro ao encerrar túnel SSH: {ex.Message}");
                 }
-            });
+            });*/
             app.Run();
         }
     }
