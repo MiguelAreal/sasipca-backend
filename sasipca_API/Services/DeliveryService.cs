@@ -324,5 +324,52 @@ namespace sasipca_API.Services
                 return (false, new Resposta("Ocorreu um erro interno ao processar a atualização da entrega."));
             }
         }
+
+
+        // ====================================================================
+        // MÉTODO PÚBLICO: Eliminar entrega existente (apenas agendadas)
+        // ====================================================================
+        public async Task<(bool success, Resposta? response)> DeleteDelivery(int deliveryID)
+        {
+            using var transaction = await _dbContext.Database.BeginTransactionAsync();
+
+            try
+            {
+                var delivery = await _dbContext.Deliveries
+                    .Include(d => d.DeliveryItems)
+                    .FirstOrDefaultAsync(d => d.Id == deliveryID);
+
+                if (delivery == null)
+                {
+                    return (false, new Resposta($"Entrega com ID {deliveryID} não encontrada."));
+                }
+
+                // Só permite eliminar entregas com estado "Agendada"
+                if (delivery.StatusId != (int)Enums.DeliveryStatus.Agendada)
+                {
+                    return (false, new Resposta($"Apenas entregas com estado 'Agendada' podem ser eliminadas. Estado atual: '{(Enums.DeliveryStatus)delivery.StatusId}'."));
+                }
+
+                // Remover itens associados
+                if (delivery.DeliveryItems.Any())
+                {
+                    _dbContext.DeliveryItems.RemoveRange(delivery.DeliveryItems);
+                }
+
+                // Remover a entrega
+                _dbContext.Deliveries.Remove(delivery);
+
+                await _dbContext.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return (true, new Resposta($"Entrega ID {deliveryID} eliminada com sucesso."));
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                return (false, new Resposta("Ocorreu um erro interno ao eliminar a entrega."));
+            }
+        }
+
     }
 }

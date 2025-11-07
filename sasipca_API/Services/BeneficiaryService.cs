@@ -23,7 +23,7 @@ namespace sasipca_API.Services
                 .Where(p => (string.IsNullOrEmpty(searchTerm) || p.Name.ToLower().Contains(searchTermLower)))
                 .Select(p => new BeneficiaryListDTO
                 {
-                    Id = p.Id,
+                    BeneficiaryId = p.Id,
                     Name = p.Name,
                     Email = p.Email
                 });

@@ -3,14 +3,14 @@
 namespace sasipca_API.Dtos
 {
     /// <summary>
-    /// Classe base de Data Transfer Object para lista beneficiários.
+    /// Classe base de Data Transfer Object para item dentro de lista beneficiários.
     /// </summary>
     public class BeneficiaryListDTO
     {
         /// <summary>
         /// Identificador do beneficiário
         /// </summary>
-        public int Id { get; set; }
+        public int BeneficiaryId { get; set; }
 
         /// <summary>
         /// Nome do beneficiário

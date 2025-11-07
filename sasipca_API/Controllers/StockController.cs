@@ -382,9 +382,42 @@ namespace sasipca_API.Controllers
             return BadRequest(result);
         }
 
+        // ----------------------------------------------------
+        // ENDPOINT 6: ELIMINA UMA ENTREGA AGENDADA
+        // ----------------------------------------------------
+        /// <summary>
+        /// Elimina uma entrega agendada.
+        /// Só é possível eliminar uma entrega se esta estiver como 'Agendada'.
+        /// </summary>
+        [HttpDelete("delivery/{deliveryId}")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(Resposta))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(Resposta))]
+        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(Resposta))]
+        public async Task<ActionResult> DeleteDelivery(int deliveryId)
+        {
+
+            // 1. Chamar o Serviço para executar a lógica de eliminar entrega
+            var (success, result) = await _deliveryService.DeleteDelivery(
+                deliveryId
+            );
+
+            if (success)
+            {
+                return Ok(result);
+            }
+
+            // Retorna 400 ou 404 dependendo do erro retornado pelo serviço.
+            if (result.Message.Contains("não encontrado"))
+            {
+                return NotFound(result);
+            }
+
+            return BadRequest(result);
+        }
+
 
         // ----------------------------------------------------
-        // ENDPOINT 6: CONSULTA DE ENTREGAS (COM FILTROS)
+        // ENDPOINT 7: CONSULTA DE ENTREGAS (COM FILTROS)
         // ----------------------------------------------------
         /// <summary>
         /// Retorna a lista de todas as entregas (cabeçalhos), com opções de filtragem por status, beneficiário e data.

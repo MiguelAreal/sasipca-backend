@@ -23,20 +23,17 @@ namespace sasipca_API.Dtos
         [Phone]
         public string Contact { get; set; }
 
-        [Required]
-        public string Course { get; set; }
+        public string? Course { get; set; }
 
-        [Required]
-        public int CurricularYear { get; set; }
-
-        public string GlobalObs { get; set; }
-
-        public string ParticularObs { get; set; }   
+        public int? CurricularYear { get; set; }
+        public int? StudentNum { get; set; }
+        public int? Nif { get;set;  }
+        public string? GlobalObs { get; set; }
+        public string? ParticularObs { get; set; }   
 
         // Para criação de morada.
         [MaxLength(255)]
         public string Street { get; set; }
-
         public int Number { get; set; }
 
         [MaxLength(9)]

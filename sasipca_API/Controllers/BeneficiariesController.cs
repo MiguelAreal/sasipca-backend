@@ -71,19 +71,35 @@ namespace sasipca_API.Controllers
                     Contact = beneficiaryPostDto.Contact,
                     Course = beneficiaryPostDto.Course,
                     CurricularYear = beneficiaryPostDto.CurricularYear,
+                    StudentNum = beneficiaryPostDto.StudentNum,
+                    Nif = beneficiaryPostDto.Nif,
                     GlobalObs = beneficiaryPostDto.GlobalObs,
                     CreatedBy = userId,
                     Address = new BeneficiaryAddress
                     {
                         Street = beneficiaryPostDto.Street,
-                        PostalCode = beneficiaryPostDto.PostalCode,
-                        Number = beneficiaryPostDto.Number
+                        Number = beneficiaryPostDto.Number,
+                        PostalCode = beneficiaryPostDto.PostalCode
                     }
                 };
 
 
                 await _dbContext.Beneficiaries.AddAsync(beneficiary);
                 await _dbContext.SaveChangesAsync();
+
+                // Cria observação particular (se existir no DTO)
+                if (!string.IsNullOrWhiteSpace(beneficiaryPostDto.ParticularObs))
+                {
+                    var particularOb = new ParticularOb
+                    {
+                        UserId = userId,
+                        BeneficiaryId = beneficiary.Id,
+                        Obs = beneficiaryPostDto.ParticularObs
+                    };
+
+                    await _dbContext.ParticularObs.AddAsync(particularOb);
+                    await _dbContext.SaveChangesAsync();
+                }
 
                 return Ok(new Resposta("Perfil criado com sucesso."));
             }
@@ -109,7 +125,7 @@ namespace sasipca_API.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(Resposta))]
         [Produces("application/json")]
         [HttpPut("{beneficiaryId}")]
-        public async Task<IActionResult> PutBeneficiary(int beneficiaryId, [FromBody] BeneficiaryPutDTO beneficiaryPutDto)
+        public async Task<IActionResult> PutBeneficiary(int beneficiaryId, [FromBody] BeneficiaryPostDTO beneficiaryPutDto)
         {
             try
             {
@@ -138,6 +154,8 @@ namespace sasipca_API.Controllers
                 beneficiary.Course = beneficiaryPutDto.Course;
                 beneficiary.CurricularYear = beneficiaryPutDto.CurricularYear;
                 beneficiary.GlobalObs = beneficiaryPutDto.GlobalObs;
+                beneficiary.Nif = beneficiaryPutDto.Nif;
+                beneficiary.StudentNum = beneficiaryPutDto.StudentNum;
 
                 // Atualizar ou criar morada
                 if (beneficiary.Address == null)
@@ -256,47 +274,59 @@ namespace sasipca_API.Controllers
 
 
         /// <summary>
-        /// Busca um beneficiário específico.
+        /// Busca um beneficiário específico, incluindo morada e observações particulares do utilizador autenticado.
         /// </summary>
         /// <param name="beneficiaryId">ID do beneficiário a consultar</param>
         /// <returns>Detalhes de um beneficiário</returns>
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<BeneficiaryGetDTO>))]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(BeneficiaryGetDTO))]
         [ProducesResponseType(StatusCodes.Status401Unauthorized, Type = typeof(Resposta))]
         [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(Resposta))]
         [Produces("application/json")]
         [HttpGet("{beneficiaryId}")]
-        public async Task<ActionResult<Resposta>> GetProfile(int beneficiaryId)
+        public async Task<ActionResult> GetProfile(int beneficiaryId)
         {
             try
             {
-                var beneficiary = await _dbContext.Beneficiaries
-                    .Where(p => p.Id == beneficiaryId)
-                    .Select(p => new BeneficiaryGetDTO
-                    {
-                       Id = p.Id,
-                       Name = p.Name,
-                       Email = p.Email,
-                       Contact = p.Contact,
-                       Nif = p.Nif,
-                       Course = p.Course,
-                       CurricularYear = p.CurricularYear,
-                       StudentNum = p.StudentNum
-                    })
-                        .FirstOrDefaultAsync();
+                int userId = (int)HttpContext.Items["UserId"];
 
-                    if (beneficiary == null)
-                        return NotFound(new Resposta("Perfil não encontrado."));
+                var beneficiary = await _dbContext.Beneficiaries
+                    .Where(b => b.Id == beneficiaryId)
+                    .Include(b => b.Address)
+                    .Include(b => b.ParticularObs)
+                    .Select(b => new BeneficiaryGetDTO
+                    {
+                        BeneficiaryId = b.Id,
+                        Name = b.Name,
+                        Email = b.Email,
+                        Contact = b.Contact,
+                        Course = b.Course,
+                        CurricularYear = b.CurricularYear,
+                        StudentNum = b.StudentNum,
+                        Nif = b.Nif,
+                        GlobalObs = b.GlobalObs,
+
+                        // Apenas a observação particular do utilizador autenticado
+                        ParticularObs = b.ParticularObs
+                            .Where(po => po.UserId == userId)
+                            .Select(po => po.Obs)
+                            .FirstOrDefault(),
+
+                        Street = b.Address != null ? b.Address.Street : null,
+                        Number = b.Address != null ? b.Address.Number : null,
+                        PostalCode = b.Address != null ? b.Address.PostalCode : null
+                    })
+                    .FirstOrDefaultAsync();
+
+                if (beneficiary == null)
+                    return NotFound(new Resposta("Perfil não encontrado."));
 
                 return Ok(beneficiary);
-                
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                return BadRequest(new Resposta("Ocorreu um erro ao obter o perfil."));
+                return BadRequest(new Resposta($"Ocorreu um erro ao obter o perfil: {ex.Message}"));
             }
         }
-
 
     }
 }

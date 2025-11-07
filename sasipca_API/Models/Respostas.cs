@@ -1,4 +1,6 @@
-﻿namespace sasipca_API.Models
+﻿using NuGet.Common;
+
+namespace sasipca_API.Models
 {
     #region Classes de Resposta
 
@@ -7,8 +9,10 @@
     /// </summary>
     public class AuthResponse
     {
+        public string AccessToken { get; set; }
+        public string RefreshToken { get; set; }
+        public int ExpiresIn { get; set; }
         public int? UserID { get; set; }
-        public string Token { get; set; }
         public string UserName { get; set; }
 
         /// <summary>
@@ -17,11 +21,14 @@
         /// <param name="token">Access Token</param>
         /// <param name="userId">ID do user</param>
         /// <param name="userName">Nome do user</param>
-        public AuthResponse(string token,int userId,string userName)
+        public AuthResponse(string accesstoken,string refreshtoken,int expiresin, int userId,string userName)
         {
+            AccessToken = accesstoken;
+            RefreshToken = refreshtoken;
+            ExpiresIn = expiresin;
             UserName = userName;
             UserID = userId;
-            Token = token;
+            
         }
     }
 
