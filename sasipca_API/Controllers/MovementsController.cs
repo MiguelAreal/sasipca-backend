@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using sasipca_API.DBModels;
 using sasipca_API.Dtos;
+using sasipca_API.Enumerators;
 using sasipca_API.Models;
 using System.Collections.Generic;
 using System.Linq;
@@ -32,7 +33,7 @@ namespace sasipca_API.Controllers
         /// Busca o histórico geral das movimentações de stock (cabeçalho, uma linha por movimento).
         /// </summary>
         /// <returns>Lista de movimentos resumidos.</returns>
-        [HttpGet("history")]
+        [HttpGet()]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<VMovHistory>))]
         [ProducesResponseType(StatusCodes.Status401Unauthorized, Type = typeof(Resposta))]
         public async Task<ActionResult<IEnumerable<VMovHistory>>> GetMovementHistory()
@@ -58,7 +59,7 @@ namespace sasipca_API.Controllers
         /// </summary>
         /// <param name="movementId">ID da movimentação.</param>
         /// <returns>Objeto contendo o cabeçalho do movimento e uma lista dos seus itens.</returns>
-        [HttpGet("details/{movementId}")]
+        [HttpGet("{movementId}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(MovementDetailDTO))] // Usaremos um DTO de resposta aninhado
         [ProducesResponseType(StatusCodes.Status401Unauthorized, Type = typeof(Resposta))]
         [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(Resposta))]
@@ -81,6 +82,8 @@ namespace sasipca_API.Controllers
             return Ok(structuredResponse);
         }
 
+
+        
 
 
         // ----------------------------------------------------

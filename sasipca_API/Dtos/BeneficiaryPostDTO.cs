@@ -33,11 +33,25 @@ namespace sasipca_API.Dtos
 
         // Para criação de morada.
         [MaxLength(255)]
-        public string Street { get; set; }
-        public int Number { get; set; }
+        public string? Street { get; set; }
+        public int? Number { get; set; }
 
         [MaxLength(9)]
-        public string PostalCode { get; set; }
+        public string? PostalCode { get; set; }
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            bool anyFilled = !string.IsNullOrWhiteSpace(Street) || Number.HasValue || !string.IsNullOrWhiteSpace(PostalCode);
+            bool allFilled = !string.IsNullOrWhiteSpace(Street) && Number.HasValue && !string.IsNullOrWhiteSpace(PostalCode);
+
+            if (anyFilled && !allFilled)
+            {
+                yield return new ValidationResult(
+                    "Se algum campo de endereço estiver preenchido, todos os campos (Rua, Número, Código Postal) devem estar preenchidos.",
+                    new[] { nameof(Street), nameof(Number), nameof(PostalCode) }
+                );
+            }
+        }
 
     }
 

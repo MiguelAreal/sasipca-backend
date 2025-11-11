@@ -78,7 +78,7 @@ namespace sasipca_API.Controllers
                     Address = new BeneficiaryAddress
                     {
                         Street = beneficiaryPostDto.Street,
-                        Number = beneficiaryPostDto.Number,
+                        Number = beneficiaryPostDto.Number ?? 0,
                         PostalCode = beneficiaryPostDto.PostalCode
                     }
                 };
@@ -158,21 +158,24 @@ namespace sasipca_API.Controllers
                 beneficiary.StudentNum = beneficiaryPutDto.StudentNum;
 
                 // Atualizar ou criar morada
-                if (beneficiary.Address == null)
+                if (!string.IsNullOrWhiteSpace(beneficiaryPutDto.Street) || beneficiaryPutDto.Number.HasValue || !string.IsNullOrWhiteSpace(beneficiaryPutDto.PostalCode))
                 {
-                    beneficiary.Address = new BeneficiaryAddress
+                    // Pelo menos um campo preenchido -> atualizar ou criar
+                    if (beneficiary.Address == null)
                     {
-                        Street = beneficiaryPutDto.Street,
-                        Number = beneficiaryPutDto.Number,
-                        PostalCode = beneficiaryPutDto.PostalCode
-                    };
+                        beneficiary.Address = new BeneficiaryAddress();
+                    }
+
+                    beneficiary.Address.Street = beneficiaryPutDto.Street ?? "";
+                    beneficiary.Address.Number = beneficiaryPutDto.Number ?? 0; // ou outro valor padrão
+                    beneficiary.Address.PostalCode = beneficiaryPutDto.PostalCode ?? "";
                 }
                 else
                 {
-                    beneficiary.Address.Street = beneficiaryPutDto.Street;
-                    beneficiary.Address.Number = beneficiaryPutDto.Number;
-                    beneficiary.Address.PostalCode = beneficiaryPutDto.PostalCode;
+                    // Todos vazios -> remover endereço
+                    beneficiary.Address = null;
                 }
+
 
                 // Faz o upsert da observação particular
                 if (!string.IsNullOrWhiteSpace(beneficiaryPutDto.ParticularObs))

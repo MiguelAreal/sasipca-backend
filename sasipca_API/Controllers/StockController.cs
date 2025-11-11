@@ -415,7 +415,6 @@ namespace sasipca_API.Controllers
             return BadRequest(result);
         }
 
-
         // ----------------------------------------------------
         // ENDPOINT 7: CONSULTA DE ENTREGAS (COM FILTROS)
         // ----------------------------------------------------

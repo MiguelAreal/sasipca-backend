@@ -11,7 +11,6 @@ namespace sasipca_API.Models
     {
         public string AccessToken { get; set; }
         public string RefreshToken { get; set; }
-        public int ExpiresIn { get; set; }
         public int? UserID { get; set; }
         public string UserName { get; set; }
 
@@ -21,11 +20,10 @@ namespace sasipca_API.Models
         /// <param name="token">Access Token</param>
         /// <param name="userId">ID do user</param>
         /// <param name="userName">Nome do user</param>
-        public AuthResponse(string accesstoken,string refreshtoken,int expiresin, int userId,string userName)
+        public AuthResponse(string accesstoken,string refreshtoken,int userId,string userName)
         {
             AccessToken = accesstoken;
             RefreshToken = refreshtoken;
-            ExpiresIn = expiresin;
             UserName = userName;
             UserID = userId;
             

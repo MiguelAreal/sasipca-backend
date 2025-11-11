@@ -94,9 +94,6 @@ namespace sasipca_API.Controllers
                 // Gera AccessToken
                 var accessToken = _jwtService.GenerateToken(user.Id, user.Email);
 
-                //Tempo restante do access token, em segundos.
-                int expiresIn = (int)(_jwtService.GetTokenExpiration(accessToken) - DateTime.UtcNow).TotalSeconds;
-
                 //Gera ou busca RefreshToken
                 var refreshToken = await GerarOuManterRefreshToken(user);
 
@@ -110,7 +107,7 @@ namespace sasipca_API.Controllers
                     IsEssential = true
                 });
 
-                return Ok(new AuthResponse(accessToken,refreshToken, expiresIn,user.Id,user.Name));
+                return Ok(new AuthResponse(accessToken,refreshToken, user.Id,user.Name));
             }
             catch (Exception)
             {
@@ -182,12 +179,9 @@ namespace sasipca_API.Controllers
                 // 6. Gerar novo accesstoken e ver se é preciso novo RefreshToken
                 var novoAccessToken = _jwtService.GenerateToken(user.Id, user.Email);
 
-                //Tempo restante do access token, em segundos.
-                int expiresIn = (int)(_jwtService.GetTokenExpiration(novoAccessToken) - DateTime.UtcNow).TotalSeconds;
-
                 var novoRefreshToken = await AtualizarRefreshTokenSeProximoExpirar(user);
 
-                return Ok(new AuthResponse(novoAccessToken,novoRefreshToken, expiresIn, user.Id,user.Name));
+                return Ok(new AuthResponse(novoAccessToken,novoRefreshToken, user.Id,user.Name));
             }
             catch (Exception)
             {
