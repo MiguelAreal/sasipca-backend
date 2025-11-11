@@ -51,34 +51,72 @@ namespace sasipca_API.Controllers
         /// <param name="searchTerm">Termo para busca por nome</param>
         /// <returns>Lista paginada de produtos</returns>
         [HttpGet()]
-        public async Task<List<ProductListDTO>> GetAllProducts(string searchTerm)
+        public async Task<ActionResult<PaginatedResponse<ProductListDTO>>> GetAllProducts(
+         [FromQuery] int pageNumber = 1,
+         [FromQuery] int pageSize = 10,
+         [FromQuery] string orderBy = "asc",
+         [FromQuery] string searchTerm = "")
         {
-            var searchTermLower = searchTerm?.ToLower() ?? string.Empty;
-
-            // Use a VIEW que já contém todos os dados de produto e stock TOTAL por Barcode.
-            var query = _dbContext.VStockPerProducts.AsQueryable();
-
-            if (!string.IsNullOrEmpty(searchTerm))
+            try
             {
-                query = query.Where(p => p.Name.ToLower().Contains(searchTermLower));
-            }
+                // Validação de parâmetros
+                if (pageNumber < 1) pageNumber = 1;
+                if (pageSize < 1 || pageSize > 50) pageSize = 10;
+                if (orderBy != "asc" && orderBy != "desc")
+                    return BadRequest(new Resposta("Parâmetro orderBy deve ser 'asc' ou 'desc'"));
 
-            // Projetar o resultado para o ProductListDTO.
-            var products = query
-                .Select(p => new ProductListDTO
+                var searchTermLower = searchTerm?.ToLower() ?? string.Empty;
+
+                // Consulta à view
+                var query = _dbContext.VStockPerProducts.AsQueryable();
+                if (!string.IsNullOrEmpty(searchTerm))
+                    query = query.Where(p => p.Name.ToLower().Contains(searchTermLower));
+
+                // Projeção
+                var products = query
+                    .Select(p => new ProductListDTO
+                    {
+                        Barcode = p.Barcode,
+                        Name = p.Name,
+                        Category = p.CategoryType,
+                        Unit = p.UnitType,
+                        UnitSize = p.UnitSize,
+                        TotalQuantity = (int)p.TotalQuantity,
+                        ReservedQuantity = (int)p.ReservedQuantity,
+                        AvailableStock = (int)p.AvailableStock
+                    });
+
+                // Ordenação
+                products = orderBy == "desc"
+                    ? products.OrderByDescending(p => p.Name)
+                    : products.OrderBy(p => p.Name);
+
+                // Paginação
+                var totalCount = await products.CountAsync();
+                var pagedProducts = await products
+                    .Skip((pageNumber - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToListAsync();
+
+                if (!pagedProducts.Any())
+                    return NotFound(new Resposta("Nenhum produto encontrado."));
+
+                var paginatedResponse = new PaginatedResponse<ProductListDTO>
                 {
-                    // Colunas diretas da VIEW
-                    Barcode = p.Barcode,
-                    Name = p.Name,
-                    Category = p.CategoryType,
-                    Unit = p.UnitType,
-                    UnitSize = p.UnitSize,
-                    TotalQuantity = (int)p.TotalQuantity,
-                    ReservedQuantity = (int)p.ReservedQuantity,
-                    AvailableStock = (int)p.AvailableStock
-                });
+                    Data = pagedProducts,
+                    PageNumber = pageNumber,
+                    PageSize = pageSize,
+                    TotalCount = totalCount,
+                    TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+                };
 
-            return await products.ToListAsync();
+                return Ok(paginatedResponse);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError,
+                    new Resposta($"Ocorreu um erro interno ao obter os produtos: {ex.Message}"));
+            }
         }
 
 
