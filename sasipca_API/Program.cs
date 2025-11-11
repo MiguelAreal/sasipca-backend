@@ -166,6 +166,10 @@ namespace sasipca_API
                             if (context.AuthenticateFailure is SecurityTokenExpiredException)
                             {
                                 errorCode = "expired_token";
+
+                                context.Response.Headers["WWW-Authenticate"] =
+                                @"Bearer error=""expired_token"", error_description=""The access token expired""";
+
                             }
                         }
 

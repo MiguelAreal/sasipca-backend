@@ -23,7 +23,7 @@ namespace sasipca_API.Controllers
     /// <summary>
     /// AuthController Tem como objetivo suportar todas os endpoints relacionados com autenticação de utilizador.
     /// </summary>
-    [Route("api")]
+    [Route("api/auth")]
     [ApiController]
     public class AuthController : ControllerBase
     {
@@ -202,11 +202,13 @@ namespace sasipca_API.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(Resposta))]
         [Produces("application/json")]
         [HttpPost("logout")]
+        [Authorize]
         public async Task<IActionResult> Logout()
         {
             try
             {
-                var userId = (int)HttpContext.Items["UserId"];
+                int userId = (int)HttpContext.Items["UserId"];
+
                 var pessoa = await _dbcontext.Users.FindAsync(userId);
 
                 if (pessoa == null)

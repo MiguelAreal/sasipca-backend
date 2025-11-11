@@ -49,7 +49,6 @@ namespace sasipca_API.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(Resposta))]
         [Produces("application/json")]
         [HttpPost()]
-        [AllowAnonymous]
         public async Task<IActionResult> PostBeneficiary([FromBody] BeneficiaryPostDTO beneficiaryPostDto)
         {
             try
