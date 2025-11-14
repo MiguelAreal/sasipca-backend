@@ -224,51 +224,5 @@ namespace sasipca_API.Controllers
         }
 
 
-        /// <returns>Lista de categorias</returns>
-        /// <summary>
-        /// Busca as listas de categorias e tipos de unidade para produtos.
-        /// </summary>
-        /// <returns>Objeto contendo as listas.</returns>
-        [HttpGet("lists")]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ListsGetDTO))]
-        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(Resposta))]
-        [Produces("application/json")]
-        public async Task<ActionResult<ListsGetDTO>> GetProductLists()
-        {
-            try
-            {
-                // Busca categorias
-                var categorias = await _dbContext.CategoryTypes
-                    .Select(c => new CategoriesGetDTO
-                    {
-                        Id = c.Id,
-                        Type = c.Type
-                    }).ToListAsync();
-
-                // Busca tipos de unidade
-                var tipos = await _dbContext.UnitTypes
-                    .Select(u => new UnitTypesGetDTO
-                    {
-                        Id = u.Id,
-                        Type = u.Type
-                    }).ToListAsync();
-
-                if ((!categorias.Any()) && (!tipos.Any()))
-                    return NotFound(new Resposta("Nenhuma lista encontrada."));
-
-                var result = new ListsGetDTO
-                {
-                    Categories = categorias,
-                    Types = tipos
-                };
-
-                return Ok(result);
-            }
-            catch (Exception)
-            {
-                return BadRequest(new Resposta("Ocorreu um erro ao obter as listas."));
-            }
-        }
-
     } 
 }
