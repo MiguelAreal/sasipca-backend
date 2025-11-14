@@ -18,7 +18,6 @@ namespace sasipca_API.Controllers
     /// </summary>
     [Route("api/lists")]
     [ApiController]
-    [Authorize]
     public class ListController : ControllerBase
     {
         private readonly SasipcaContext _dbContext;
