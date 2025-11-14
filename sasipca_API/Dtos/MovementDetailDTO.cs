@@ -8,7 +8,7 @@
         // Cabeçalho
         public int MovementId { get; set; }
         public DateTime MovementDate { get; set; }
-        public string MovementType { get; set; } = null!;
+        public int MovementTypeId { get; set; }
         public string? MovementNote { get; set; }
 
         // Utilizador

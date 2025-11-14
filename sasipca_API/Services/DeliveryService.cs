@@ -119,7 +119,7 @@ namespace sasipca_API.Services
         // MÉTODO PÚBLICO: CREATE DELIVERY
         // ====================================================================
         public async Task<(bool success, Resposta? response)> CreateDelivery(
-            DeliveryCreationDTO dto,
+            DeliveryPostDTO dto,
             int userId,
             Enums.DeliveryStatus initialStatus,
             bool deductStock)
@@ -228,30 +228,23 @@ namespace sasipca_API.Services
                     return (false, new Resposta($"A entrega está em estado final ('{((Enums.DeliveryStatus)delivery.StatusId)}') e não pode ser alterada."));
                 }
 
-                var oldStatus = (Enums.DeliveryStatus)delivery.StatusId;
-                var newStatus = dto.NewStatus ?? oldStatus;
+                var oldStatus = delivery.StatusId;
+
+                var newStatus = dto.NewStatusId;
 
                 // Variáveis para atualização
                 var newScheduledDate = dto.ScheduledDate ?? delivery.ScheduledDate;
                 var lotsToUpdate = new List<ProductLot>();
                 Movement? newMovement = null;
 
-                // 2. REVERTER RESERVAS EXISTENTES
-                // Isto é sempre necessário quando os itens mudam OU o status muda de Agendada para outro
-                if (delivery.DeliveryItems.Any() || newStatus != oldStatus)
-                {
-                    _dbContext.DeliveryItems.RemoveRange(delivery.DeliveryItems);
-                    delivery.DeliveryItems.Clear(); // Limpar a coleção em memória
-                }
-
                 // 3. PROCESSAMENTO DA TRANSIÇÃO DE ESTADO
-                if (newStatus == Enums.DeliveryStatus.Cancelada)
+                if (newStatus == (int)Enums.DeliveryStatus.Cancelada)
                 {
-                    // 3.1. Cancelar: Apenas atualizar o status e nota. A reserva já foi revertida.
+                    // 3.1. Cancelar: Apenas atualizar o status e nota.
                     delivery.StatusId = (int)Enums.DeliveryStatus.Cancelada;
                     delivery.Note = dto.Note ?? delivery.Note;
                 }
-                else if (newStatus == Enums.DeliveryStatus.Entregue)
+                else if (newStatus == (int)Enums.DeliveryStatus.Entregue)
                 {
                     // 3.2. ENTREGUE: Requer validação de STOCK/VALIDADE e DEDUÇÃO imediata.
 

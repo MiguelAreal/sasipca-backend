@@ -9,11 +9,21 @@ public partial class VMovHistoryDetail
 
     public DateTime MovementDate { get; set; }
 
-    public string MovementType { get; set; } = null!;
+    public int MovementTypeId { get; set; }
 
     public string? MovementNote { get; set; }
 
+    public int UserId { get; set; }
+
+    public string UserName { get; set; } = null!;
+
+    public int? DeliveryId { get; set; }
+
+    public int MovementItemId { get; set; }
+
     public int ItemQuantityAffected { get; set; }
+
+    public int ProductLotId { get; set; }
 
     public string ProductLotNumber { get; set; } = null!;
 
@@ -22,16 +32,4 @@ public partial class VMovHistoryDetail
     public string ProductBarcode { get; set; } = null!;
 
     public string ProductName { get; set; } = null!;
-
-    public int UserId { get; set; }
-
-    public string UserName { get; set; } = null!;
-
-    public int? DeliveryId { get; set; }
-
-    public DateOnly? DeliveryScheduledDate { get; set; }
-
-    public int? BeneficiaryId { get; set; }
-
-    public string? BeneficiaryName { get; set; }
 }

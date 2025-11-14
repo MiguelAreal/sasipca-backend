@@ -5,7 +5,7 @@
     /// </summary>
     public class MovementItemDTO
     {
-        public int QuantityAffected { get; set; }
+        public int ItemQuantityAffected { get; set; }
         public string ProductBarcode { get; set; } = null!;
         public string ProductName { get; set; } = null!;
         public string ProductLotNumber { get; set; } = null!;

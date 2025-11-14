@@ -1,19 +1,30 @@
 ﻿namespace sasipca_API.Dtos
 {
-
     /// <summary>
-    /// Objeto de categoria de um produto.
+    /// Objeto de listas.
     /// </summary>
-    public class CategoriaProdutoGetDTO
+    public class ListsGetDTO
     {
         /// <summary>
-        /// Identificador da categoria do produto.
+        /// Lista de categorias.
         /// </summary>
-        public int Id { get; set; }
+        public List<CategoriesGetDTO> Categories { get; set; } = new();
 
         /// <summary>
-        /// Nome da categoria do produto.
+        /// Lista de tipos de unidades.
         /// </summary>
+        public List<UnitTypesGetDTO> Types { get; set; } = new();
+    }
+
+    public class CategoriesGetDTO
+    {
+        public int Id { get; set; }
+        public string Type { get; set; } = null!;
+    }
+
+    public class UnitTypesGetDTO
+    {
+        public int Id { get; set; }
         public string Type { get; set; } = null!;
     }
 }

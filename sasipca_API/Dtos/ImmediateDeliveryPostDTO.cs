@@ -4,20 +4,13 @@ using Xunit.Sdk;
 namespace sasipca_API.Dtos
 {
     /// <summary>
-    /// Payload para criar uma nova Entrega de Stock a um Beneficiário.
+    /// Payload para criar uma nova Entrega IMEDIATA de Stock a um Beneficiário
     /// </summary>
-    public class DeliveryCreationDTO
+    public class ImmediateDeliveryPostDTO
     {
         [Required(ErrorMessage = "O ID do beneficiário é obrigatório.")]
         [Range(1, int.MaxValue, ErrorMessage = "ID do beneficiário inválido.")]
         public int BeneficiaryId { get; set; }
-
-        /// <summary>
-        /// A data em que a entrega está agendada para ocorrer.
-        /// Se a data for hoje ou passada, a entrega será marcada como 'Entregue' imediatamente, deduzindo o stock.
-        /// </summary>
-        [Required(ErrorMessage = "A data agendada é obrigatória.")]
-        public DateOnly ScheduledDate { get; set; }
 
         /// <summary>
         /// Notas ou observações sobre a entrega (opcional).

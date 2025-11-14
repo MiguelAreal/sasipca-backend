@@ -222,7 +222,7 @@ namespace sasipca_API.Services
             var query = _dbContext.Set<VDelivery>().AsQueryable();
 
             if (filters.DeliveryStatus.HasValue)
-                query = query.Where(d => d.Status == filters.DeliveryStatus.Value.ToString());
+                query = query.Where(d => d.StatusId == filters.DeliveryStatus);
 
             if (filters.BeneficiaryId.HasValue)
                 query = query.Where(d => d.BeneficiaryId == filters.BeneficiaryId.Value);
@@ -251,19 +251,19 @@ namespace sasipca_API.Services
             {
                 sb.AppendLine("ID Movimento;Data;Tipo;Utilizador;Nota;Quantidade Total Afetada");
                 foreach (var h in history)
-                    sb.AppendLine($"{h.MovementId};{h.MovementDate:yyyy-MM-dd HH:mm};{h.MovementType};{h.UserName};{h.MovementNote};{h.TotalQuantityAffected}");
+                    sb.AppendLine($"{h.MovementId};{h.MovementDate:yyyy-MM-dd HH:mm};{h.MovementTypeId};{h.UserName};{h.MovementNote};{h.TotalQuantityAffected}");
             }
             else if (type == ReportTypesEnum.DeliveryHeaders && data is List<VDelivery> deliveries)
             {
                 sb.AppendLine("ID Entrega;Data Agendada;Status;Beneficiário;Utilizador;Nota");
                 foreach (var d in deliveries)
-                    sb.AppendLine($"{d.DeliveryId};{d.ScheduledDate:yyyy-MM-dd};{d.Status};{d.BeneficiaryName};{d.UserName};{d.Note}");
+                    sb.AppendLine($"{d.DeliveryId};{d.ScheduledDate:yyyy-MM-dd};{d.StatusId};{d.BeneficiaryName};{d.UserName};{d.Note}");
             }
             else if (type == ReportTypesEnum.MovementDetails && data is List<VMovHistoryDetail> details)
             {
                 sb.AppendLine("ID Movimento;Tipo;Data;Barcode;Produto;Lote;Quantidade;Utilizador");
                 foreach (var d in details)
-                    sb.AppendLine($"{d.MovementId};{d.MovementType};{d.MovementDate:yyyy-MM-dd HH:mm};{d.ProductBarcode};{d.ProductName};{d.ProductLotNumber};{d.ItemQuantityAffected};{d.UserName}");
+                    sb.AppendLine($"{d.MovementId};{d.MovementTypeId};{d.MovementDate:yyyy-MM-dd HH:mm};{d.ProductBarcode};{d.ProductName};{d.ProductLotNumber};{d.ItemQuantityAffected};{d.UserName}");
             }
 
             return Encoding.UTF8.GetBytes(sb.ToString());

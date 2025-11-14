@@ -19,9 +19,9 @@ namespace sasipca_API.Dtos
         public string Name { get; set; } = null!;
 
         /// <summary>
-        /// Tipo de Unidade do produto.
+        /// ID de tipo de Unidade do produto.
         /// </summary>
-        public string? Unit { get; set; }
+        public int UnitId { get; set; }
 
         /// <summary>
         /// Quantidade que um item tráz ("1" kg, "2" Litros)
@@ -29,9 +29,9 @@ namespace sasipca_API.Dtos
         public int? UnitSize { get; set; }
 
         /// <summary>
-        /// Tipo de Categoria do Produto.
+        /// ID de Tipo de Categoria do Produto.
         /// </summary>
-        public string Category { get; set; } = null!;
+        public int CategoryId { get; set; }
 
         /// <summary>
         /// Quantidade total real/tangível do produto (De todos os lotes combinado)

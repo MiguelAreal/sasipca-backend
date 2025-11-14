@@ -23,14 +23,16 @@ namespace sasipca_API.Controllers
     {
         private readonly SasipcaContext _dbContext;
         private readonly IDeliveryService _deliveryService;
+        private readonly IAuthService _authService;
         /// <summary>
         /// Inicialização do Stock Controller
         /// Lida com todas as movimentações de stock.
         /// </summary>
-        public StockController(SasipcaContext context, IDeliveryService deliveryService)
+        public StockController(SasipcaContext context, IDeliveryService deliveryService, IAuthService authService)
         {
             _dbContext = context;
             _deliveryService = deliveryService;
+            _authService = authService;
         }
 
         // ----------------------------------------------------
@@ -40,12 +42,18 @@ namespace sasipca_API.Controllers
         /// Regista uma Entrada de Stock. Pode criar um novo Produto e o seu stock inicial
         /// ou adicionar stock a lotes de um Produto já existente.
         /// </summary>
-        [HttpPost("receipt")]
+        [HttpPost("receipts")]
         [ProducesResponseType(StatusCodes.Status201Created)]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(Resposta))]
         public async Task<ActionResult> StockReceipt([FromBody] StockReceiptDTO dto)
         {
-            var userId = (int)HttpContext.Items["UserId"];
+            int? userId = _authService.GetUserId();
+            if (userId == null)
+            {
+                return Unauthorized(new Resposta("Utilizador não autenticado."));
+            }
+
+
             var barcode = dto.Barcode;
 
             if (!ModelState.IsValid)
@@ -56,8 +64,7 @@ namespace sasipca_API.Controllers
             using var transaction = await _dbContext.Database.BeginTransactionAsync();
 
             try
-            {
-                // O tipo de 'product' é inferido. Assumindo que o Barcode é a chave.
+            {               
                 var product = await _dbContext.Products.FirstOrDefaultAsync(p => p.Barcode == barcode);
                 var isNewProduct = product == null;
 
@@ -88,14 +95,14 @@ namespace sasipca_API.Controllers
                 // 3. Criar o cabeçalho da Movimentação
                 var newMovement = new Movement
                 {
-                    UserId = userId,
+                    UserId = userId.Value,
                     MovementTypeId = (int)Enums.MovementTypes.Entrada,
                     CreatedAt = DateTime.UtcNow,
-                    Note = dto.Note ?? (isNewProduct ? "Criação de produto e primeira entrada de stock." : "Entrada de stock (receção).")
+                    Note = dto.Note
                 };
                 _dbContext.Movements.Add(newMovement);
 
-                // Salvar para garantir o rastreio do produto/movimentação.
+                // Guardar para garantir o rastreio do produto/movimentação.
                 await _dbContext.SaveChangesAsync();
 
 
@@ -117,9 +124,10 @@ namespace sasipca_API.Controllers
                         // Lote existe: Apenas adiciona a quantidade
                         productLot.Quantity += itemDto.Quantity;
 
-                        if (productLot.ExpiryDate < itemDto.ExpiryDate)
+                        // Se o lote for o mesmo, atualiza a data de expiração apenas quando a introduzida é maior.
+                        if (productLot.ExpiryDate < DateOnly.FromDateTime(itemDto.ExpiryDate))
                         {
-                            productLot.ExpiryDate = itemDto.ExpiryDate;
+                            productLot.ExpiryDate = DateOnly.FromDateTime(itemDto.ExpiryDate);
                         }
                     }
                     else
@@ -130,12 +138,12 @@ namespace sasipca_API.Controllers
                             Barcode = barcode,
                             Lot = itemDto.Lot,
                             Quantity = itemDto.Quantity,
-                            ExpiryDate = itemDto.ExpiryDate // Assumindo DateOnly?
+                            ExpiryDate = DateOnly.FromDateTime(itemDto.ExpiryDate)
                         };
                         _dbContext.ProductLots.Add(productLot);
                     }
 
-                    // 5. Criar o Item da Movimentação (log)
+                    // 5. Criar o Item da Movimentação
                     newMovement.MovementItems.Add(new MovementItem
                     {
                         // Usa a instância productLot que foi criada ou carregada
@@ -156,7 +164,6 @@ namespace sasipca_API.Controllers
             catch (Exception ex)
             {
                 await transaction.RollbackAsync();
-                // _logger.LogError(ex, "Erro ao processar a entrada de stock unificada.");
                 return StatusCode(StatusCodes.Status500InternalServerError, new Resposta("Ocorreu um erro interno ao processar a entrada de stock."));
             }
         }
@@ -170,7 +177,7 @@ namespace sasipca_API.Controllers
         /// registando uma Movimentação de Ajuste.
         /// A remoção está limitada ao stock disponível (Total - Reservado).
         /// </summary>
-        [HttpPatch("adjust")]
+        [HttpPatch("adjusts")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(Resposta))]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(Resposta))]
         [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(Resposta))]
@@ -257,100 +264,63 @@ namespace sasipca_API.Controllers
             }
         }
 
+       
         // ----------------------------------------------------
-        // ENDPOINT 3: SAÍDA ESPONTÂNEA (ENTREGUE IMEDIATAMENTE)
+        // ENDPOINT 3: AGENDAR SAÍDA / EXECUTAR SAÍDA
         // ----------------------------------------------------
         /// <summary>
-        /// Regista uma Saída de Stock imediata (entrega espontânea) a um Beneficiário.
-        /// Marca o Delivery como 'Entregue' e deduz o stock automáticamente.
+        /// Agenda uma Entrega futura a um Beneficiário -> Não deduz stock, apenas cria o registo e marca como agendada.
+        /// Executa saída imediata -> Deduz stock, cria registo e marca como concluída.
         /// </summary>
-        [HttpPost("delivery/out")]
+        /// <param name="dto">DTO com payload de dados.</param>
+        /// <param name="instant">TRUE se for entrega imediata, FALSE se for para agendar.</param>
+        [HttpPost("deliveries")]
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(Resposta))]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(Resposta))]
-        public async Task<ActionResult> ImmediateDelivery([FromBody] DeliveryCreationDTO dto)
+        public async Task<ActionResult> CreateDelivery([FromQuery] bool instant, [FromBody] DeliveryPostDTO dto)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
             // 1. Obter UserId do Context
-            var userId = (int)HttpContext.Items["UserId"];
-
-            // 2. Validação da Data (Saída imediata: deve ser hoje ou passado)
-            if (dto.ScheduledDate > DateOnly.FromDateTime(DateTime.Today))
+            int? userId = _authService.GetUserId();
+            if (userId == null)
             {
-                return BadRequest(new Resposta("Para uma saída imediata, a ScheduledDate deve ser hoje ou uma data passada."));
+                return Unauthorized(new Resposta("Utilizador não autenticado."));
             }
 
-
-            // 3. Chamar o Serviço
-            var (success, result) = await _deliveryService.CreateDelivery(
-                dto,
-                userId,
-                Enums.DeliveryStatus.Entregue,
-                true // Dedução de Stock: SIM
-            );
-
-            if (success)
+            // Validação da data apenas para agendadas
+            if (!instant && dto.ScheduledDate < DateOnly.FromDateTime(DateTime.Today))
             {
-                return StatusCode(StatusCodes.Status201Created, result);
+                return BadRequest(new Resposta("A data agendada deve ser futura."));
             }
 
-            // O resultado da falha já contém a Resposta com a mensagem de erro.
-            return BadRequest(result);
-        }
-
-
-        // ----------------------------------------------------
-        // ENDPOINT 4: AGENDAR SAÍDA (PROGRAMADA)
-        // ----------------------------------------------------
-        /// <summary>
-        /// Agenda uma Entrega futura a um Beneficiário. Não deduz stock; apenas cria o registo.
-        /// Marca a Delivery como 'Agendada'.
-        /// </summary>
-        [HttpPost("delivery/schedule")]
-        [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(Resposta))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(Resposta))]
-        public async Task<ActionResult> ScheduleDelivery([FromBody] DeliveryCreationDTO dto)
-        {
-            if (!ModelState.IsValid) return BadRequest(ModelState);
-
-            // 1. Obter UserId do Context
-            var userIdClaim = HttpContext.Items["UserId"];
-
-            if (userIdClaim == null || !int.TryParse(userIdClaim.ToString(), out int userId))
+            // Se for uma entrega imediata, define-se a data de entrega como HOJE.
+            if (instant)
             {
-                return Unauthorized(new Resposta("Utilizador não autenticado ou ID de utilizador inválido."));
-            }
-
-            // 2. Validação da Data (Agendamento: deve ser futura)
-            if (dto.ScheduledDate < DateOnly.FromDateTime(DateTime.Today))
-            {
-                return BadRequest(new Resposta("Para agendar uma entrega, a ScheduledDate deve ser uma data futura."));
+                dto.ScheduledDate = DateOnly.FromDateTime(DateTime.Today);
             }
 
             // 3. Chamar o Serviço
             var (success, result) = await _deliveryService.CreateDelivery(
-                dto,
-                userId,
-                Enums.DeliveryStatus.Agendada, // Status: Agendada (1)
-                false // Dedução de Stock: NÃO
+               dto,
+               userId.Value,
+               instant ? Enums.DeliveryStatus.Entregue : Enums.DeliveryStatus.Agendada,
+               instant // deduz stock?
             );
 
-            if (success)
-            {
-                return StatusCode(StatusCodes.Status201Created, result);
-            }
-
-            return BadRequest(result);
+            return success
+            ? StatusCode(StatusCodes.Status201Created, result)
+            : BadRequest(result);
         }
 
         // ----------------------------------------------------
-        // ENDPOINT 5: ATUALIZAÇÃO E ALTERAÇÃO DE ESTADO DA ENTREGA
+        // ENDPOINT 4: ATUALIZAÇÃO E ALTERAÇÃO DE ESTADO DA ENTREGA
         // ----------------------------------------------------
         /// <summary>
         /// Atualiza os dados de uma entrega agendada (data, itens ou status).
         /// Fluxo de estado: Agendada -> [Agendada, Entregue, Cancelada]. Outros estados são finais.
         /// </summary>
-        [HttpPut("delivery/{deliveryId}")]
+        [HttpPut("deliveries/{deliveryId}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(Resposta))]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(Resposta))]
         [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(Resposta))]
@@ -383,13 +353,13 @@ namespace sasipca_API.Controllers
         }
 
         // ----------------------------------------------------
-        // ENDPOINT 6: ELIMINA UMA ENTREGA AGENDADA
+        // ENDPOINT 5: ELIMINA UMA ENTREGA AGENDADA
         // ----------------------------------------------------
         /// <summary>
         /// Elimina uma entrega agendada.
         /// Só é possível eliminar uma entrega se esta estiver como 'Agendada'.
         /// </summary>
-        [HttpDelete("delivery/{deliveryId}")]
+        [HttpDelete("deliveries/{deliveryId}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(Resposta))]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(Resposta))]
         [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(Resposta))]
@@ -415,57 +385,7 @@ namespace sasipca_API.Controllers
             return BadRequest(result);
         }
 
-        // ----------------------------------------------------
-        // ENDPOINT 7: CONSULTA DE ENTREGAS (COM FILTROS)
-        // ----------------------------------------------------
-        /// <summary>
-        /// Retorna a lista de todas as entregas (cabeçalhos), com opções de filtragem por status, beneficiário e data.
-        /// </summary>
-        /// <param name="query">Parâmetros de filtro (StatusId, BeneficiaryId, DateFrom, DateTo).</param>
-        /// <returns>Lista de cabeçalhos de entregas.</returns>
-        [HttpGet("delivery")]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<VDelivery>))]
-        public async Task<ActionResult<IEnumerable<VDelivery>>> GetDeliveries([FromQuery] DeliveryQueryDTO query)
-        {
-            // Usamos a View pré-agregada que já contém todos os nomes e o status em formato string.
-            var deliveriesQuery = _dbContext.VDeliveries.AsQueryable();
-
-            // 1. Aplicação dos Filtros
-
-            if (query.StatusId.HasValue)
-            {
-                // NOTA: Se o StatusId for passado, precisamos de filtrar pela string correspondente.
-                // É melhor ter uma coluna StatusId na View ou mapear o StatusId para a string do enum:
-                var statusString = ((Enums.DeliveryStatus)query.StatusId.Value).ToString();
-                deliveriesQuery = deliveriesQuery.Where(d => d.Status == statusString);
-
-                // ALTERNATIVA: Se quiser manter o StatusId como int na query:
-                // deliveriesQuery = deliveriesQuery.Where(d => d.StatusId == (int)query.StatusId.Value); 
-                // Mas a View teria de incluir a coluna StatusId.
-            }
-
-            if (query.BeneficiaryId.HasValue)
-            {
-                deliveriesQuery = deliveriesQuery.Where(d => d.BeneficiaryId == query.BeneficiaryId.Value);
-            }
-
-            if (query.DateFrom.HasValue)
-            {
-                deliveriesQuery = deliveriesQuery.Where(d => d.ScheduledDate >= DateOnly.FromDateTime(query.DateFrom.Value));
-            }
-
-            if (query.DateTo.HasValue)
-            {
-                deliveriesQuery = deliveriesQuery.Where(d => d.ScheduledDate <= DateOnly.FromDateTime(query.DateTo.Value));
-            }
-
-            // 2. Execução da Query
-            var result = await deliveriesQuery
-                .OrderByDescending(d => d.ScheduledDate)
-                .ToListAsync();
-
-            return Ok(result);
-        }
+       
     }
 
 }

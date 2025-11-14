@@ -66,7 +66,7 @@ namespace sasipca_API.Services
             {
                 var header = details.First();
                 sb.AppendLine("<h4>Detalhes do Movimento:</h4>");
-                sb.AppendLine($"<p>Tipo: <strong>{header.MovementType}</strong> | Data: <strong>{header.MovementDate:yyyy-MM-dd HH:mm}</strong></p>");
+                sb.AppendLine($"<p>Tipo: <strong>{header.MovementTypeId}</strong> | Data: <strong>{header.MovementDate:yyyy-MM-dd HH:mm}</strong></p>");
                 sb.AppendLine($"<p>Utilizador: <strong>{header.UserName}</strong> | Nota: <strong>{header.MovementNote ?? "N/A"}</strong></p>");
 
                 if (header.DeliveryId.HasValue)
@@ -88,7 +88,7 @@ namespace sasipca_API.Services
                 sb.AppendLine("</thead><tbody>");
                 foreach (var h in history)
                 {
-                    sb.AppendLine($"<tr><td>{h.MovementDate:yyyy-MM-dd HH:mm}</td><td>{h.MovementType}</td><td>{h.UserName}</td><td>{h.MovementNote ?? "-"}</td><td class='align-right'>{h.TotalQuantityAffected}</td></tr>");
+                    sb.AppendLine($"<tr><td>{h.MovementDate:yyyy-MM-dd HH:mm}</td><td>{h.MovementTypeId}</td><td>{h.UserName}</td><td>{h.MovementNote ?? "-"}</td><td class='align-right'>{h.TotalQuantityAffected}</td></tr>");
                 }
             }
             else if (type == ReportTypesEnum.DeliveryHeaders && data is List<VDelivery> deliveries)
@@ -97,7 +97,7 @@ namespace sasipca_API.Services
                 sb.AppendLine("</thead><tbody>");
                 foreach (var d in deliveries)
                 {
-                    sb.AppendLine($"<tr><td>{d.ScheduledDate:yyyy-MM-dd}</td><td>{d.Status}</td><td>{d.BeneficiaryName}</td><td>{d.UserName}</td><td>{d.Note ?? "-"}</td></tr>");
+                    sb.AppendLine($"<tr><td>{d.ScheduledDate:yyyy-MM-dd}</td><td>{d.StatusId}</td><td>{d.BeneficiaryName}</td><td>{d.UserName}</td><td>{d.Note ?? "-"}</td></tr>");
                 }
             }
             else if (type == ReportTypesEnum.MovementDetails && data is List<VMovHistoryDetail> movdetails)

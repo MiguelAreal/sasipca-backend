@@ -51,6 +51,8 @@ public partial class SasipcaContext : DbContext
 
     public virtual DbSet<User> Users { get; set; }
 
+    public virtual DbSet<VDeliveriesDetail> VDeliveriesDetails { get; set; }
+
     public virtual DbSet<VDelivery> VDeliveries { get; set; }
 
     public virtual DbSet<VMovHistory> VMovHistories { get; set; }
@@ -679,6 +681,30 @@ public partial class SasipcaContext : DbContext
                 .HasColumnName("updated_at");
         });
 
+        modelBuilder.Entity<VDeliveriesDetail>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToView("v_deliveries_details");
+
+            entity.Property(e => e.BeneficiaryId).HasColumnType("int(11)");
+            entity.Property(e => e.BeneficiaryName).HasMaxLength(50);
+            entity.Property(e => e.DeliveryId).HasColumnType("int(11)");
+            entity.Property(e => e.DeliveryItemId).HasColumnType("int(11)");
+            entity.Property(e => e.ItemCreatedAt)
+                .HasDefaultValueSql("current_timestamp()")
+                .HasColumnType("timestamp");
+            entity.Property(e => e.ItemQuantity).HasColumnType("int(11)");
+            entity.Property(e => e.Note).HasColumnType("text");
+            entity.Property(e => e.ProductBarcode).HasMaxLength(255);
+            entity.Property(e => e.ProductLotId).HasColumnType("int(11)");
+            entity.Property(e => e.ProductLotNumber).HasMaxLength(255);
+            entity.Property(e => e.ProductName).HasMaxLength(255);
+            entity.Property(e => e.StatusId).HasColumnType("int(11)");
+            entity.Property(e => e.UserId).HasColumnType("int(11)");
+            entity.Property(e => e.UserName).HasMaxLength(255);
+        });
+
         modelBuilder.Entity<VDelivery>(entity =>
         {
             entity
@@ -689,7 +715,7 @@ public partial class SasipcaContext : DbContext
             entity.Property(e => e.BeneficiaryName).HasMaxLength(50);
             entity.Property(e => e.DeliveryId).HasColumnType("int(11)");
             entity.Property(e => e.Note).HasColumnType("text");
-            entity.Property(e => e.Status).HasMaxLength(255);
+            entity.Property(e => e.StatusId).HasColumnType("int(11)");
             entity.Property(e => e.UserId).HasColumnType("int(11)");
             entity.Property(e => e.UserName).HasMaxLength(255);
         });
@@ -700,31 +726,16 @@ public partial class SasipcaContext : DbContext
                 .HasNoKey()
                 .ToView("v_mov_history");
 
-            entity.Property(e => e.DeliveryId)
-                .HasColumnType("int(11)")
-                .HasColumnName("delivery_id");
+            entity.Property(e => e.DeliveryId).HasColumnType("int(11)");
             entity.Property(e => e.MovementDate)
                 .HasDefaultValueSql("current_timestamp()")
-                .HasColumnType("datetime")
-                .HasColumnName("movement_date");
-            entity.Property(e => e.MovementId)
-                .HasColumnType("int(11)")
-                .HasColumnName("movement_id");
-            entity.Property(e => e.MovementNote)
-                .HasColumnType("text")
-                .HasColumnName("movement_note");
-            entity.Property(e => e.MovementType)
-                .HasMaxLength(255)
-                .HasColumnName("movement_type");
-            entity.Property(e => e.TotalQuantityAffected)
-                .HasPrecision(32)
-                .HasColumnName("total_quantity_affected");
-            entity.Property(e => e.UserId)
-                .HasColumnType("int(11)")
-                .HasColumnName("user_id");
-            entity.Property(e => e.UserName)
-                .HasMaxLength(255)
-                .HasColumnName("user_name");
+                .HasColumnType("datetime");
+            entity.Property(e => e.MovementId).HasColumnType("int(11)");
+            entity.Property(e => e.MovementNote).HasColumnType("text");
+            entity.Property(e => e.MovementTypeId).HasColumnType("int(11)");
+            entity.Property(e => e.TotalQuantityAffected).HasPrecision(32);
+            entity.Property(e => e.UserId).HasColumnType("int(11)");
+            entity.Property(e => e.UserName).HasMaxLength(255);
         });
 
         modelBuilder.Entity<VMovHistoryDetail>(entity =>
@@ -733,49 +744,21 @@ public partial class SasipcaContext : DbContext
                 .HasNoKey()
                 .ToView("v_mov_history_details");
 
-            entity.Property(e => e.BeneficiaryId)
-                .HasDefaultValueSql("'0'")
-                .HasColumnType("int(11)")
-                .HasColumnName("beneficiary_id");
-            entity.Property(e => e.BeneficiaryName)
-                .HasMaxLength(50)
-                .HasColumnName("beneficiary_name");
-            entity.Property(e => e.DeliveryId)
-                .HasColumnType("int(11)")
-                .HasColumnName("delivery_id");
-            entity.Property(e => e.DeliveryScheduledDate).HasColumnName("delivery_scheduled_date");
-            entity.Property(e => e.ItemQuantityAffected)
-                .HasColumnType("int(11)")
-                .HasColumnName("item_quantity_affected");
-            entity.Property(e => e.LotExpiryDate).HasColumnName("lot_expiry_date");
+            entity.Property(e => e.DeliveryId).HasColumnType("int(11)");
+            entity.Property(e => e.ItemQuantityAffected).HasColumnType("int(11)");
             entity.Property(e => e.MovementDate)
                 .HasDefaultValueSql("current_timestamp()")
-                .HasColumnType("datetime")
-                .HasColumnName("movement_date");
-            entity.Property(e => e.MovementId)
-                .HasColumnType("int(11)")
-                .HasColumnName("movement_id");
-            entity.Property(e => e.MovementNote)
-                .HasColumnType("text")
-                .HasColumnName("movement_note");
-            entity.Property(e => e.MovementType)
-                .HasMaxLength(255)
-                .HasColumnName("movement_type");
-            entity.Property(e => e.ProductBarcode)
-                .HasMaxLength(255)
-                .HasColumnName("product_barcode");
-            entity.Property(e => e.ProductLotNumber)
-                .HasMaxLength(255)
-                .HasColumnName("product_lot_number");
-            entity.Property(e => e.ProductName)
-                .HasMaxLength(255)
-                .HasColumnName("product_name");
-            entity.Property(e => e.UserId)
-                .HasColumnType("int(11)")
-                .HasColumnName("user_id");
-            entity.Property(e => e.UserName)
-                .HasMaxLength(255)
-                .HasColumnName("user_name");
+                .HasColumnType("datetime");
+            entity.Property(e => e.MovementId).HasColumnType("int(11)");
+            entity.Property(e => e.MovementItemId).HasColumnType("int(11)");
+            entity.Property(e => e.MovementNote).HasColumnType("text");
+            entity.Property(e => e.MovementTypeId).HasColumnType("int(11)");
+            entity.Property(e => e.ProductBarcode).HasMaxLength(255);
+            entity.Property(e => e.ProductLotId).HasColumnType("int(11)");
+            entity.Property(e => e.ProductLotNumber).HasMaxLength(255);
+            entity.Property(e => e.ProductName).HasMaxLength(255);
+            entity.Property(e => e.UserId).HasColumnType("int(11)");
+            entity.Property(e => e.UserName).HasMaxLength(255);
         });
 
         modelBuilder.Entity<VStockPerLot>(entity =>
@@ -784,37 +767,16 @@ public partial class SasipcaContext : DbContext
                 .HasNoKey()
                 .ToView("v_stock_per_lot");
 
-            entity.Property(e => e.AvailableStock)
-                .HasPrecision(33)
-                .HasColumnName("available_stock");
-            entity.Property(e => e.Barcode)
-                .HasMaxLength(255)
-                .HasColumnName("barcode");
-            entity.Property(e => e.Category)
-                .HasMaxLength(255)
-                .HasColumnName("category");
-            entity.Property(e => e.ExpiryDate).HasColumnName("expiry_date");
-            entity.Property(e => e.Lot)
-                .HasMaxLength(255)
-                .HasColumnName("lot");
-            entity.Property(e => e.Name)
-                .HasMaxLength(255)
-                .HasColumnName("name");
-            entity.Property(e => e.ProductLotId)
-                .HasColumnType("int(11)")
-                .HasColumnName("product_lot_id");
-            entity.Property(e => e.ReservedQuantity)
-                .HasPrecision(32)
-                .HasColumnName("reserved_quantity");
-            entity.Property(e => e.TotalQuantity)
-                .HasColumnType("int(11)")
-                .HasColumnName("total_quantity");
-            entity.Property(e => e.Unit)
-                .HasMaxLength(50)
-                .HasColumnName("unit");
-            entity.Property(e => e.UnitSize)
-                .HasColumnType("int(11)")
-                .HasColumnName("unit_size");
+            entity.Property(e => e.AvailableStock).HasPrecision(33);
+            entity.Property(e => e.Barcode).HasMaxLength(255);
+            entity.Property(e => e.CategoryId).HasColumnType("int(11)");
+            entity.Property(e => e.Lot).HasMaxLength(255);
+            entity.Property(e => e.Name).HasMaxLength(255);
+            entity.Property(e => e.ProductLotId).HasColumnType("int(11)");
+            entity.Property(e => e.ReservedQuantity).HasPrecision(32);
+            entity.Property(e => e.TotalQuantity).HasColumnType("int(11)");
+            entity.Property(e => e.UnitId).HasColumnType("int(11)");
+            entity.Property(e => e.UnitSize).HasColumnType("int(11)");
         });
 
         modelBuilder.Entity<VStockPerProduct>(entity =>
@@ -823,30 +785,14 @@ public partial class SasipcaContext : DbContext
                 .HasNoKey()
                 .ToView("v_stock_per_product");
 
-            entity.Property(e => e.AvailableStock)
-                .HasPrecision(55)
-                .HasColumnName("available_stock");
-            entity.Property(e => e.Barcode)
-                .HasMaxLength(255)
-                .HasColumnName("barcode");
-            entity.Property(e => e.CategoryType)
-                .HasMaxLength(255)
-                .HasColumnName("category_type");
-            entity.Property(e => e.Name)
-                .HasMaxLength(255)
-                .HasColumnName("name");
-            entity.Property(e => e.ReservedQuantity)
-                .HasPrecision(54)
-                .HasColumnName("reserved_quantity");
-            entity.Property(e => e.TotalQuantity)
-                .HasPrecision(32)
-                .HasColumnName("total_quantity");
-            entity.Property(e => e.UnitSize)
-                .HasColumnType("int(11)")
-                .HasColumnName("unit_size");
-            entity.Property(e => e.UnitType)
-                .HasMaxLength(50)
-                .HasColumnName("unit_type");
+            entity.Property(e => e.AvailableStock).HasPrecision(55);
+            entity.Property(e => e.Barcode).HasMaxLength(255);
+            entity.Property(e => e.CategoryId).HasColumnType("int(11)");
+            entity.Property(e => e.Name).HasMaxLength(255);
+            entity.Property(e => e.ReservedQuantity).HasPrecision(54);
+            entity.Property(e => e.TotalQuantity).HasPrecision(32);
+            entity.Property(e => e.UnitId).HasColumnType("int(11)");
+            entity.Property(e => e.UnitSize).HasColumnType("int(11)");
         });
 
         OnModelCreatingPartial(modelBuilder);

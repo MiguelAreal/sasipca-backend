@@ -5,7 +5,7 @@ namespace sasipca_API.Dtos
     /// <summary>
     /// Parâmetros de consulta para filtrar a lista de Entregas (Deliveries).
     /// </summary>
-    public class DeliveryQueryDTO
+    public class DeliveryGetDTO
     {
         /// <summary>
         /// Filtra pelo ID do status (1: Agendada, 2: Entregue, 3: Cancelada).

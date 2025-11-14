@@ -16,7 +16,7 @@ namespace sasipca_API.Dtos
         /// <summary>
         /// O novo status da entrega (1: Agendada, 2: Entregue, 3: Cancelada).
         /// </summary>
-        public Enums.DeliveryStatus? NewStatus { get; set; }
+        public int NewStatusId { get; set; }
 
         /// <summary>
         /// Notas ou observações sobre a alteração (opcional).

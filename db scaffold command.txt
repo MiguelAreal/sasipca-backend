@@ -1,1 +1,4 @@
-dotnet ef dbcontext scaffold "Server=xxx.xxx.xxx.xxx;Database=sasipca;User=user;Password=password;" Pomelo.EntityFrameworkCore.MySql -o DBModels -f --no-onconfiguring
+Tudo:
+dotnet ef dbcontext scaffold "Server=192.168.1.17;Database=sasipca;User=user;Password=password;" Pomelo.EntityFrameworkCore.MySql -o DBModels -f --no-onconfiguring
+
+

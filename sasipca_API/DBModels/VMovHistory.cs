@@ -9,7 +9,7 @@ public partial class VMovHistory
 
     public DateTime MovementDate { get; set; }
 
-    public string MovementType { get; set; } = null!;
+    public int MovementTypeId { get; set; }
 
     public string? MovementNote { get; set; }
 

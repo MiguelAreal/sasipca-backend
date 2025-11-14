@@ -9,7 +9,7 @@ namespace sasipca_API.Dtos
     {
         public DateOnly? DateFrom { get; set; }
         public DateOnly? DateTo { get; set; }
-        public Enums.DeliveryStatus? DeliveryStatus { get; set; } // Agendada, Entregue, Cancelada
+        public int? DeliveryStatus { get; set; } // Agendada, Entregue, Cancelada
         public int? BeneficiaryId { get; set; }
     }
 }

@@ -49,11 +49,9 @@ namespace sasipca_API.Services
                 {
                     Barcode = p.Product.Barcode,
                     Name = p.Product.Name,
-                    Unit = p.Product.Unit.Type,
-                    Category = p.Product.Category.Type,
+                    UnitId = p.Product.Unit.Id,
+                    CategoryId = p.Product.Category.Id,
                     TotalQuantity = p.Stock != null ? p.Stock.TotalQuantity : 0,
-                    // 💡 Observação: Assegure-se de que p.Stock.ReservedQuantity/AvailableStock
-                    // sejam do tipo C# 'decimal' ou 'int?' se você quiser o cast.
                     ReservedQuantity = p.Stock != null ? (int)p.Stock.ReservedQuantity : 0,
                     AvailableStock = p.Stock != null ? (int)p.Stock.AvailableStock : 0
                 });
@@ -95,8 +93,8 @@ namespace sasipca_API.Services
                 {
                     Barcode = p.Product.Barcode,
                     Name = p.Product.Name,
-                    Unit = p.Product.Unit.Type,
-                    Category = p.Product.Category.Type,
+                    UnitId = p.Product.Unit.Id,
+                    CategoryId = p.Product.Category.Id,
                     TotalQuantity = p.Stock != null ? p.Stock.TotalQuantity : 0,
                     ReservedQuantity = p.Stock != null ? (int?)p.Stock.ReservedQuantity : 0, // Cast decimal to int?
                     AvailableStock = p.Stock != null ? (int?)p.Stock.AvailableStock : 0      // Cast decimal to int?

@@ -133,11 +133,6 @@ namespace sasipca_API.Services
             }
         }
 
-        public int? ValidarEObterUserId(string token)
-        {
-            var principal = ValidateAccessToken(token);
-            return principal?.ObterUserId();
-        }
 
     }
 

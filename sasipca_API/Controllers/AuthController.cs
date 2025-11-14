@@ -77,27 +77,18 @@ namespace sasipca_API.Controllers
         public async Task<IActionResult> Login([FromBody] UserLoginDTO userLoginDto)
         {
             if (!ModelState.IsValid)
-            {
                 return BadRequest(new Resposta("Credenciais inválidas. Verifique os dados introduzidos."));
-            }
 
             try
             {
-                var user = await _dbcontext.Users
-                    .FirstOrDefaultAsync(u => u.Email == userLoginDto.Email);
+                var user = await _dbcontext.Users.FirstOrDefaultAsync(u => u.Email == userLoginDto.Email);
 
                 if (user == null || !_authService.VerifyPassword(userLoginDto.Password, user.Password))
-                {
                     return BadRequest(new Resposta("Credenciais inválidas. Verifique os dados introduzidos."));
-                }
 
-                // Gera AccessToken
                 var accessToken = _jwtService.GenerateToken(user.Id, user.Email);
+                var refreshToken = await _authService.GerarOuManterRefreshToken(user);
 
-                //Gera ou busca RefreshToken
-                var refreshToken = await GerarOuManterRefreshToken(user);
-
-                // Configura cookie
                 Response.Cookies.Append("refreshToken", refreshToken, new CookieOptions
                 {
                     HttpOnly = true,
@@ -107,9 +98,9 @@ namespace sasipca_API.Controllers
                     IsEssential = true
                 });
 
-                return Ok(new AuthResponse(accessToken,refreshToken, user.Id,user.Name));
+                return Ok(new AuthResponse(accessToken, refreshToken, user.Id, user.Name));
             }
-            catch (Exception)
+            catch
             {
                 return BadRequest(new Resposta("Ocorreu um erro durante o login. Tente novamente."));
             }
@@ -179,7 +170,7 @@ namespace sasipca_API.Controllers
                 // 6. Gerar novo accesstoken e ver se é preciso novo RefreshToken
                 var novoAccessToken = _jwtService.GenerateToken(user.Id, user.Email);
 
-                var novoRefreshToken = await AtualizarRefreshTokenSeProximoExpirar(user);
+                var novoRefreshToken = await _authService.AtualizarRefreshTokenSeProximoExpirar(user);
 
                 return Ok(new AuthResponse(novoAccessToken,novoRefreshToken, user.Id,user.Name));
             }
@@ -207,7 +198,11 @@ namespace sasipca_API.Controllers
         {
             try
             {
-                int userId = (int)HttpContext.Items["UserId"];
+                int? userId = _authService.GetUserId();
+                if (userId == null)
+                {
+                    return Unauthorized(new Resposta("Utilizador não autenticado."));
+                }
 
                 var pessoa = await _dbcontext.Users.FindAsync(userId);
 
@@ -255,7 +250,7 @@ namespace sasipca_API.Controllers
         /// <returns>Mensagem de confirmação</returns>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(Resposta))]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(Resposta))]
-        [HttpPost("/password/forgot")]
+        [HttpPost("password/forgot")]
         [AllowAnonymous]
         public async Task<IActionResult> ForgotPassword([FromBody] EsqueciPwdDTO esqueciPwdDto)
         {
@@ -322,7 +317,7 @@ namespace sasipca_API.Controllers
         /// <returns>Mensagem de confirmação</returns>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(Resposta))]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(Resposta))]
-        [HttpPost("/password/reset")]
+        [HttpPost("password/reset")]
         [AllowAnonymous]
         public async Task<IActionResult> ResetPassword([FromBody] AtribuirNovaPwdDTO atribuirNovaPwdDTO)
         {
@@ -360,61 +355,5 @@ namespace sasipca_API.Controllers
         }
 
 
-        #region Métodos Auxiliares Privados
-
-        private async Task<string> GerarOuManterRefreshToken(User user)
-        {
-            // Se já tem um refresh token válido, mantém
-            if (!string.IsNullOrEmpty(user.RefreshToken) &&
-                user.RefreshTokenExp > DateTime.Now)
-            {
-                return user.RefreshToken;
-            }
-
-            // Se não tem nenhum válido, gera um novo
-            try
-            {
-                var refreshToken = _jwtService.GenerateRefreshToken();
-                user.RefreshToken = refreshToken;
-                user.RefreshTokenExp = DateTime.Now.AddMinutes(_refreshTokenValidityMinutes);
-
-                await _dbcontext.SaveChangesAsync();
-                return refreshToken;
-            }
-            catch (Exception ex)
-            {
-                // Rollback em caso de erro
-                user.RefreshToken = null;
-                user.RefreshTokenExp = null;
-                throw; // Será capturado no método Login
-            }
-           
-
-        }
-
-        private async Task<string> AtualizarRefreshTokenSeProximoExpirar(User user)
-        {
-            // Verifica se está próximo de expirar (menos de 15 minutos)
-            if ((user.RefreshTokenExp!.Value - DateTime.Now).TotalMinutes < 15)
-            {
-                user.RefreshToken = _jwtService.GenerateRefreshToken();
-                user.RefreshTokenExp = DateTime.Now.AddMinutes(_refreshTokenValidityMinutes);
-                await _dbcontext.SaveChangesAsync();
-            }
-
-            // Configura cookie (mesmo que seja o mesmo token)
-            Response.Cookies.Append("refreshToken", user.RefreshToken, new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = true,
-                SameSite = SameSiteMode.None,
-                Expires = user.RefreshTokenExp,
-                IsEssential = true
-            });
-
-            return user.RefreshToken;
-        }
-
-        #endregion
     }
 }

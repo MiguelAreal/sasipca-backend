@@ -25,14 +25,14 @@ namespace sasipca_API.Dtos
         public int? UnitSize { get; set; }
 
         /// <summary>
-        /// Objeto que contém o identificador e nome da categoria do produto.
+        /// Objeto que contém o identificador da categoria do produto.
         /// </summary>
-        public string Category { get; set; } = null!;
+        public int CategoryId { get; set; }
 
         /// <summary>
-        /// Objeto que contém o identificador e nome da categoria do produto.
+        /// Objeto que contém o identificador do tipo de unidade do produto.
         /// </summary>
-        public string Unit { get; set; } = null!;
+        public int UnitId { get; set; }
        
         /// <summary>
         /// Quantidade total real/tangível do produto (De todos os lotes combinado)

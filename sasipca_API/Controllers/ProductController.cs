@@ -78,8 +78,8 @@ namespace sasipca_API.Controllers
                     {
                         Barcode = p.Barcode,
                         Name = p.Name,
-                        Category = p.CategoryType,
-                        Unit = p.UnitType,
+                        CategoryId = p.CategoryId,
+                        UnitId = p.UnitId,
                         UnitSize = p.UnitSize,
                         TotalQuantity = (int)p.TotalQuantity,
                         ReservedQuantity = (int)p.ReservedQuantity,
@@ -141,7 +141,7 @@ namespace sasipca_API.Controllers
 
                 if (!stockData.Any())
                 {
-                    // Se não houver dados de estoque, verifica-se se o produto existe na tabela Products
+                    // Se não houver dados de stock, verifica-se se o produto existe na tabela Products
                     var productExists = await _dbContext.Products
                         .AnyAsync(p => p.Barcode == barcode);
 
@@ -158,8 +158,8 @@ namespace sasipca_API.Controllers
                     // Trazemos os campos do produto uma vez
                     Name = g.First().Name,
                     UnitSize = g.First().UnitSize,
-                    Category = g.First().Category,
-                    Unit = g.First().Unit
+                    CategoryId = g.First().CategoryId,
+                    UnitId = g.First().UnitId
                 }).FirstOrDefault();
 
                 if (totalStock == null)
@@ -174,8 +174,8 @@ namespace sasipca_API.Controllers
                             Barcode = p.Barcode,
                             Name = p.Name,
                             UnitSize = p.UnitSize,
-                            Category = p.Category.Type,
-                            Unit = p.Unit.Type,
+                            CategoryId = p.Category.Id,
+                            UnitId = p.Unit.Id,
                             ProductLots = new List<ProductLotDTO>(),
                             TotalQuantity = 0,
                             ReservedQuantity = 0,
@@ -201,8 +201,8 @@ namespace sasipca_API.Controllers
                     Barcode = barcode,
                     Name = totalStock.Name,
                     UnitSize = totalStock.UnitSize,
-                    Category = totalStock.Category,
-                    Unit = totalStock.Unit,
+                    CategoryId = totalStock.CategoryId,
+                    UnitId = totalStock.UnitId,
 
                     // Totais Agregados
                     TotalQuantity = totalStock.TotalQuantity,
@@ -223,45 +223,52 @@ namespace sasipca_API.Controllers
             }
         }
 
-        /// <summary>
-        /// Busca as categorias existentes de produtos
-        /// </summary>
-        /// <remarks>
-        /// 
-        /// Exemplo de resposta:
-        /// {
-        /// 
-        ///    "Id": 1,
-        ///    "Type": "Alimento"
-        ///        
-        /// }
-        /// </remarks>
+
         /// <returns>Lista de categorias</returns>
-        [HttpGet("categories")]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<CategoriaProdutoGetDTO>))]
+        /// <summary>
+        /// Busca as listas de categorias e tipos de unidade para produtos.
+        /// </summary>
+        /// <returns>Objeto contendo as listas.</returns>
+        [HttpGet("lists")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ListsGetDTO))]
         [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(Resposta))]
         [Produces("application/json")]
-        public async Task<ActionResult<List<CategoriaProdutoGetDTO>>> GetProductCategories()
+        public async Task<ActionResult<ListsGetDTO>> GetProductLists()
         {
             try
             {
+                // Busca categorias
                 var categorias = await _dbContext.CategoryTypes
-                   .Select(p => new CategoriaProdutoGetDTO
-                   {
-                       Id = p.Id,
-                       Type = p.Type,
+                    .Select(c => new CategoriesGetDTO
+                    {
+                        Id = c.Id,
+                        Type = c.Type
+                    }).ToListAsync();
 
-                   }).ToListAsync();
+                // Busca tipos de unidade
+                var tipos = await _dbContext.UnitTypes
+                    .Select(u => new UnitTypesGetDTO
+                    {
+                        Id = u.Id,
+                        Type = u.Type
+                    }).ToListAsync();
 
-                if (categorias == null || !categorias.Any())
-                    return NotFound(new Resposta("Nenhuma categoria encontrada."));
+                if ((!categorias.Any()) && (!tipos.Any()))
+                    return NotFound(new Resposta("Nenhuma lista encontrada."));
 
-                return Ok(categorias);
+                var result = new ListsGetDTO
+                {
+                    Categories = categorias,
+                    Types = tipos
+                };
+
+                return Ok(result);
             }
             catch (Exception)
             {
-                return BadRequest(new Resposta("Ocorreu um erro ao obter as categorias."));
+                return BadRequest(new Resposta("Ocorreu um erro ao obter as listas."));
             }
         }
-    }
+
+    } 
 }

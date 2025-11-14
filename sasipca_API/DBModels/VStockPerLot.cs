@@ -9,9 +9,9 @@ public partial class VStockPerLot
 
     public string Name { get; set; } = null!;
 
-    public string Unit { get; set; } = null!;
+    public int UnitId { get; set; }
 
-    public string Category { get; set; } = null!;
+    public int CategoryId { get; set; }
 
     public int? UnitSize { get; set; }
 

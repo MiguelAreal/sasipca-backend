@@ -25,6 +25,6 @@ namespace sasipca_API.Dtos
         /// Data de validade deste lote (obrigatório para novos lotes).
         /// </summary>
         [Required(ErrorMessage = "A Data de Validade é obrigatória.")]
-        public DateOnly ExpiryDate { get; set; }
+        public DateTime ExpiryDate { get; set; }
     }
 }
