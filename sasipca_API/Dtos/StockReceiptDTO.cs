@@ -15,7 +15,7 @@ namespace sasipca_API.Dtos
 
         [Required(ErrorMessage = "A lista de Itens de Lote é obrigatória e deve ter pelo menos um item.")]
         [MinLength(1, ErrorMessage = "A lista de Itens de Lote deve conter pelo menos um item.")]
-        public List<LotReceiptItemDTO> LotsToEnter { get; set; } = new List<LotReceiptItemDTO>();
+        public List<LotReceiptItemDTO> Lots { get; set; } = new List<LotReceiptItemDTO>();
 
         // --- Campos de Criação do Produto (Opcionais, mas necessários se o produto não existir) ---
         // Se o produto não existir, a validação de negócio irá exigir estes campos.

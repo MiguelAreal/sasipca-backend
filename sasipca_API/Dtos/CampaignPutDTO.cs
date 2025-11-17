@@ -11,9 +11,9 @@ namespace sasipca_API.Dtos
         [MaxLength(255)]
         public string Name { get; set; } = null!;
 
-        public DateTime? StartDate { get; set; }
+        public DateOnly? StartDate { get; set; }
 
-        public DateTime? EndDate { get; set; }
+        public DateOnly? EndDate { get; set; }
 
         public string? Description { get; set; }
 

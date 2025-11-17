@@ -10,8 +10,8 @@
         public string? Description { get; set; }
         public string? Location { get; set; }
         public string? ImageUrl { get; set; }
-        public DateTime StartDate { get; set; }
-        public DateTime EndDate { get; set; }
+        public DateOnly StartDate { get; set; }
+        public DateOnly EndDate { get; set; }
         public string CreatorName { get; set; } = null!;
     }
 }

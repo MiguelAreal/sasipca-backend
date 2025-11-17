@@ -29,6 +29,11 @@
         /// Lista de tipos de relatórios.
         /// </summary>
         public List<ReportTypes> Reports { get; set; } = new();
+
+        /// <summary>
+        /// Lista de campanhas ativas.
+        /// </summary>
+        public List<ActiveCampaigns> ActiveCampaigns { get; set; } = new();
     }
 
     public class CategoryTypes
@@ -59,6 +64,12 @@
     {
         public int Id { get; set; }
         public string Type { get; set; } = null!;
+    }
+
+    public class ActiveCampaigns
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = null!;
     }
 
 }

@@ -13,9 +13,16 @@ public partial class Movement
 
     public int? DeliveryId { get; set; }
 
+    /// <summary>
+    /// Apenas se aplica quando movement_type é &apos;Receção&apos;
+    /// </summary>
+    public int? CampaignId { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public string? Note { get; set; }
+
+    public virtual Campaign? Campaign { get; set; }
 
     public virtual Delivery? Delivery { get; set; }
 

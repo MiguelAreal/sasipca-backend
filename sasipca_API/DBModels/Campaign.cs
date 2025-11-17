@@ -17,13 +17,15 @@ public partial class Campaign
 
     public string? Location { get; set; }
 
-    public DateTime EndDate { get; set; }
+    public DateOnly EndDate { get; set; }
 
     public DateTime? UpdatedAt { get; set; }
 
-    public DateTime StartDate { get; set; }
+    public DateOnly StartDate { get; set; }
 
     public DateTime CreatedAt { get; set; }
+
+    public virtual ICollection<Movement> Movements { get; set; } = new List<Movement>();
 
     public virtual User? User { get; set; }
 }

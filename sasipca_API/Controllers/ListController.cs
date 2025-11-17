@@ -87,13 +87,25 @@ namespace sasipca_API.Controllers
                         Type = u.Type
                     }).ToListAsync();
 
+                // Busca campanhas ativas (dentro de intervalo de tempo)
+                var campanhas = await _dbContext.Campaigns
+                .Where(c => c.StartDate <= DateOnly.FromDateTime(DateTime.Today)&& c.EndDate >= DateOnly.FromDateTime(DateTime.Today)) // Apenas campanhas ativas
+                .Select(u => new ActiveCampaigns
+                {
+                    Id = u.Id,
+                    Name = u.Name
+                })
+                .ToListAsync();
+
+
                 var lists = new ListsGetDTO
                 {
                     Categories = categorias,
                     Units = unidades,
                     Movements = movimentos,
                     Deliveries = entregas,
-                    Reports = relatórios
+                    Reports = relatórios,
+                    ActiveCampaigns = campanhas
                 };
 
                 return Ok(lists);

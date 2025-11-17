@@ -18,8 +18,6 @@ namespace sasipca_API.Services
         {
             var searchTermLower = searchTerm?.ToLower() ?? string.Empty;
 
-            // 💡 SOLUÇÃO: Forçar a execução no banco de dados aqui.
-            // Isso é seguro, pois o GroupBy e Sum reduzem o volume de dados drasticamente.
             var totalStockData = await _dbcontext.VStockPerLots
                 .GroupBy(v => v.Barcode)
                 .Select(g => new
@@ -29,7 +27,7 @@ namespace sasipca_API.Services
                     ReservedQuantity = g.Sum(x => x.ReservedQuantity),
                     AvailableStock = g.Sum(x => x.AvailableStock)
                 })
-                .ToListAsync(); // <--- CHAVE: Executar a agregação primeiro no DB
+                .ToListAsync(); // Executar a agregação primeiro na DB
 
             // Step 2: Query Products and perform a LEFT JOIN (GroupJoin) IN MEMORY.
             // O GroupJoin (e FirstOrDefault) agora é feito sobre uma lista em memória.
@@ -64,8 +62,7 @@ namespace sasipca_API.Services
         {
             var searchTermLower = searchTerm?.ToLower() ?? string.Empty;
 
-            // Step 1: Aggregate the stock data from the VAvailableStockPerLot view by Barcode.
-            // This is crucial because the view provides stock PER LOT, but the DTO needs the TOTAL stock.
+            // Agregar dados de stock da view VAvailableStockPerLot
             var totalStockData = _dbcontext.VStockPerLots
                 .GroupBy(v => v.Barcode)
                 .Select(g => new
@@ -76,7 +73,7 @@ namespace sasipca_API.Services
                     AvailableStock = g.Sum(x => x.AvailableStock)
                 });
 
-            // Step 2: Query Products and perform a LEFT JOIN (GroupJoin) with the aggregated stock data.
+            // Buscar produtos e fazer LeftJoin para dados agregados
             var products = _dbcontext.Products
                 .Where(p => (string.IsNullOrEmpty(searchTerm) || p.Name.ToLower().Contains(searchTermLower)))
                 .Include(p => p.Category)
@@ -88,7 +85,7 @@ namespace sasipca_API.Services
                     (product, stockGroup) => new { Product = product, Stock = stockGroup.FirstOrDefault() }
                 )
 
-                // Step 3: Project the result into the ProductListDTO.
+                // Projetar resultados para ProductListDTO.
                 .Select(p => new ProductListDTO
                 {
                     Barcode = p.Product.Barcode,

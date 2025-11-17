@@ -53,7 +53,6 @@ namespace sasipca_API.Controllers
                 return Unauthorized(new Resposta("Utilizador não autenticado."));
             }
 
-
             var barcode = dto.Barcode;
 
             if (!ModelState.IsValid)
@@ -84,10 +83,40 @@ namespace sasipca_API.Controllers
                     {
                         Barcode = dto.Barcode,
                         Name = dto.Name!,
-                        CategoryId = dto.CategoryId!.Value,
-                        UnitId = dto.UnitId!.Value,
                         UnitSize = dto.UnitSize
                     };
+
+                    // --- Associação à categoria ---
+                    if (dto.CategoryId.HasValue)
+                    {
+                        var category = await _dbContext.CategoryTypes
+                            .FirstOrDefaultAsync(c => c.Id == dto.CategoryId.Value);
+
+                        if (category == null)
+                        {
+                            await transaction.RollbackAsync();
+                            return BadRequest(new Resposta($"Categoria '{dto.CategoryId.Value}' não encontrada."));
+                        }
+
+                        product.CategoryId = category.Id;
+                    }
+
+                    // --- Associação a tipo de unidade ---
+                    if (dto.UnitId.HasValue)
+                    {
+                        var unit = await _dbContext.UnitTypes
+                            .FirstOrDefaultAsync(c => c.Id == dto.UnitId.Value);
+
+                        if (unit == null)
+                        {
+                            await transaction.RollbackAsync();
+                            return BadRequest(new Resposta($"Tipo de unidade '{dto.CategoryId.Value}' não encontrada."));
+                        }
+
+                        product.UnitId = unit.Id;
+                    }
+
+
                     _dbContext.Products.Add(product);
                 }
                 // ELSE: Produto existe. Os campos Name, CategoryId, etc. são ignorados.
@@ -97,17 +126,30 @@ namespace sasipca_API.Controllers
                 {
                     UserId = userId.Value,
                     MovementTypeId = (int)Enums.MovementTypes.Entrada,
-                    CreatedAt = DateTime.UtcNow,
                     Note = dto.Note
                 };
-                _dbContext.Movements.Add(newMovement);
 
-                // Guardar para garantir o rastreio do produto/movimentação.
+                // --- Associação opcional do movimento à campanha ---
+                if (dto.campaignId.HasValue)
+                {
+                    var campaign = await _dbContext.Campaigns
+                        .FirstOrDefaultAsync(c => c.Id == dto.campaignId.Value);
+
+                    if (campaign == null)
+                    {
+                        await transaction.RollbackAsync();
+                        return BadRequest(new Resposta($"Campanha '{dto.campaignId.Value}' não encontrada."));
+                    }
+
+                    newMovement.CampaignId = campaign.Id;
+                }
+
+                _dbContext.Movements.Add(newMovement);
                 await _dbContext.SaveChangesAsync();
 
 
                 // 4. Processar Lotes
-                foreach (var itemDto in dto.LotsToEnter)
+                foreach (var itemDto in dto.Lots)
                 {
                     // Validação de lote: a quantidade tem que ser positiva para entrada
                     if (itemDto.Quantity <= 0)

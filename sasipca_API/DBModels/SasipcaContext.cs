@@ -176,9 +176,7 @@ public partial class SasipcaContext : DbContext
             entity.Property(e => e.Description)
                 .HasColumnType("text")
                 .HasColumnName("description");
-            entity.Property(e => e.EndDate)
-                .HasColumnType("datetime")
-                .HasColumnName("end_date");
+            entity.Property(e => e.EndDate).HasColumnName("end_date");
             entity.Property(e => e.ImageUrl)
                 .HasMaxLength(100)
                 .HasColumnName("image_url");
@@ -188,9 +186,7 @@ public partial class SasipcaContext : DbContext
             entity.Property(e => e.Name)
                 .HasMaxLength(50)
                 .HasColumnName("name");
-            entity.Property(e => e.StartDate)
-                .HasColumnType("datetime")
-                .HasColumnName("start_date");
+            entity.Property(e => e.StartDate).HasColumnName("start_date");
             entity.Property(e => e.UpdatedAt)
                 .HasColumnType("datetime")
                 .HasColumnName("updated_at");
@@ -333,9 +329,15 @@ public partial class SasipcaContext : DbContext
 
             entity.HasIndex(e => e.DeliveryId, "movements_fk3");
 
+            entity.HasIndex(e => e.CampaignId, "movements_fk4");
+
             entity.Property(e => e.Id)
                 .HasColumnType("int(11)")
                 .HasColumnName("id");
+            entity.Property(e => e.CampaignId)
+                .HasComment("Apenas se aplica quando movement_type é 'Receção'")
+                .HasColumnType("int(11)")
+                .HasColumnName("campaignId");
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql("current_timestamp()")
                 .HasColumnType("datetime")
@@ -352,6 +354,10 @@ public partial class SasipcaContext : DbContext
             entity.Property(e => e.UserId)
                 .HasColumnType("int(11)")
                 .HasColumnName("user_id");
+
+            entity.HasOne(d => d.Campaign).WithMany(p => p.Movements)
+                .HasForeignKey(d => d.CampaignId)
+                .HasConstraintName("movements_fk4");
 
             entity.HasOne(d => d.Delivery).WithMany(p => p.Movements)
                 .HasForeignKey(d => d.DeliveryId)
