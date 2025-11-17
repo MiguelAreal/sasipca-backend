@@ -24,14 +24,20 @@ namespace sasipca_API.Dtos
         public int? UnitId { get; set; }
 
         /// <summary>
-        /// Quantidade por unidade (ex: 1kg, 250ml). Valor padrão 1.
+        /// Quantidade por unidade (ex: 1000g, 250ml). Valor padrão 1.
         /// </summary>
         public int UnitSize { get; set; } = 1;
 
-        // --- Campo de Movimentação (Opcional) ---
+        // --- Campo de Observações (Opcional) ---
         /// <summary>
         /// Notas ou observações sobre a entrada (opcional).
         /// </summary>
         public string? Note { get; set; }
+
+        // --- Associar a campanha (Opcional) ---
+        /// <summary>
+        /// Associar esta receção de stock a uma campanha (opcional).
+        /// </summary>
+        public int? campaignId { get; set; }
     }
 }

@@ -159,7 +159,7 @@ namespace sasipca_API.Services
                     newMovement = new Movement
                     {
                         UserId = userId,
-                        MovementTypeId = (int)MovementTypes.Saida,
+                        MovementTypeId = (int)Enums.MovementTypes.Saida,
                         Delivery = newDelivery,
                         Note = dto.Note
                     };
@@ -252,7 +252,7 @@ namespace sasipca_API.Services
                     newMovement = new Movement
                     {
                         UserId = userId,
-                        MovementTypeId = (int)MovementTypes.Saida,
+                        MovementTypeId = (int)Enums.MovementTypes.Saida,
                         Delivery = delivery,
                         Note = dto.Note
                     };

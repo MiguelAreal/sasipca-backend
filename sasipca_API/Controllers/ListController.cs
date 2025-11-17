@@ -14,7 +14,7 @@ using sasipca_API.DBModels;
 namespace sasipca_API.Controllers
 {
     /// <summary>
-    /// Controller para gestão de produtos.
+    /// Controller para listas de dados (relação ID - Nome para tipos, status, etc).
     /// </summary>
     [Route("api/lists")]
     [ApiController]
@@ -27,7 +27,7 @@ namespace sasipca_API.Controllers
         private readonly IProductService _productService;
 
         /// <summary>
-        /// Inicialização do ProdutoController
+        /// Inicialização do ListController
         /// </summary>
         public ListController(SasipcaContext context)
         {
@@ -49,30 +49,54 @@ namespace sasipca_API.Controllers
             {
                 // Busca categorias
                 var categorias = await _dbContext.CategoryTypes
-                    .Select(c => new CategoriesGetDTO
+                    .Select(c => new CategoryTypes
                     {
                         Id = c.Id,
                         Type = c.Type
                     }).ToListAsync();
 
                 // Busca tipos de unidade
-                var tipos = await _dbContext.UnitTypes
-                    .Select(u => new UnitTypesGetDTO
+                var unidades = await _dbContext.UnitTypes
+                    .Select(u => new UnitTypes
                     {
                         Id = u.Id,
                         Type = u.Type
                     }).ToListAsync();
 
-                if ((!categorias.Any()) && (!tipos.Any()))
-                    return NotFound(new Resposta("Nenhuma lista encontrada."));
+                // Busca tipos de movimentos
+                var movimentos = await _dbContext.MovementTypes
+                    .Select(u => new MovementTypes
+                    {
+                        Id = u.Id,
+                        Type = u.Type
+                    }).ToListAsync();
 
-                var result = new ListsGetDTO
+                // Busca status de entregas
+                var entregas = await _dbContext.DeliveryStatuses
+                    .Select(u => new DeliveriesStatus
+                    {
+                        Id = u.Id,
+                        Status = u.Status
+                    }).ToListAsync();
+
+                // Busca tipos de relatórios
+                var relatórios = await _dbContext.ReportTypes
+                    .Select(u => new ReportTypes
+                    {
+                        Id = u.Id,
+                        Type = u.Type
+                    }).ToListAsync();
+
+                var lists = new ListsGetDTO
                 {
                     Categories = categorias,
-                    Types = tipos
+                    Units = unidades,
+                    Movements = movimentos,
+                    Deliveries = entregas,
+                    Reports = relatórios
                 };
 
-                return Ok(result);
+                return Ok(lists);
             }
             catch (Exception)
             {
