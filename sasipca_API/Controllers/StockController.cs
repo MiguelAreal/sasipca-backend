@@ -24,15 +24,17 @@ namespace sasipca_API.Controllers
         private readonly SasipcaContext _dbContext;
         private readonly IDeliveryService _deliveryService;
         private readonly IAuthService _authService;
+        private readonly ITypesService _typesService;
         /// <summary>
         /// Inicialização do Stock Controller
         /// Lida com todas as movimentações de stock.
         /// </summary>
-        public StockController(SasipcaContext context, IDeliveryService deliveryService, IAuthService authService)
+        public StockController(SasipcaContext context, IDeliveryService deliveryService, IAuthService authService, ITypesService typesService)
         {
             _dbContext = context;
             _deliveryService = deliveryService;
             _authService = authService;
+            _typesService = typesService;
         }
 
         // ----------------------------------------------------
@@ -89,31 +91,26 @@ namespace sasipca_API.Controllers
                     // --- Associação à categoria ---
                     if (dto.CategoryId.HasValue)
                     {
-                        var category = await _dbContext.CategoryTypes
-                            .FirstOrDefaultAsync(c => c.Id == dto.CategoryId.Value);
-
-                        if (category == null)
+                        if (!(await _typesService.VerifyCategory(dto.CategoryId.Value)))
                         {
                             await transaction.RollbackAsync();
                             return BadRequest(new Resposta($"Categoria '{dto.CategoryId.Value}' não encontrada."));
                         }
 
-                        product.CategoryId = category.Id;
+                        product.CategoryId = dto.CategoryId.Value;
                     }
 
                     // --- Associação a tipo de unidade ---
                     if (dto.UnitId.HasValue)
                     {
-                        var unit = await _dbContext.UnitTypes
-                            .FirstOrDefaultAsync(c => c.Id == dto.UnitId.Value);
-
-                        if (unit == null)
+                        if (!(await _typesService.VerifyUnit(dto.UnitId.Value)))
                         {
                             await transaction.RollbackAsync();
                             return BadRequest(new Resposta($"Tipo de unidade '{dto.CategoryId.Value}' não encontrada."));
                         }
 
-                        product.UnitId = unit.Id;
+
+                        product.UnitId = dto.UnitId.Value;
                     }
 
 

@@ -26,17 +26,20 @@ namespace sasipca_API.Controllers
         private readonly IAuthService _authService;
         private readonly ImageProcessingService _imageProcessingService;
         private readonly IProductService _productService;
+        private readonly ITypesService _typesService;
 
         /// <summary>
         /// Inicialização do ProdutoController
         /// </summary>
-        public ProductController(SasipcaContext context, INotificationService notifService, IAuthService authService, ImageProcessingService imageProcessingService, IProductService productService)
+        public ProductController(SasipcaContext context, INotificationService notifService, IAuthService authService, ImageProcessingService imageProcessingService, IProductService productService, ITypesService typesService)
         {
             _dbContext = context;
             _notifService = notifService;
             _authService = authService;
             _imageProcessingService = imageProcessingService;
             _productService = productService;
+            _typesService = typesService;
+            
         }
 
 
@@ -220,6 +223,82 @@ namespace sasipca_API.Controllers
                 // Idealmente, deve registar a exceção 'ex' aqui
                 return StatusCode(StatusCodes.Status500InternalServerError,
                                     new Resposta("Ocorreu um erro interno ao obter o produto."));
+            }
+        }
+
+
+
+        // ----------------------------------------------------
+        // ATUALIZAÇÃO DE PRODUTO (PUT)
+        // ----------------------------------------------------
+        /// <summary>
+        /// Atualiza os dados de cabeçalho de um produto.
+        /// Apenas Nome, Categoria, Quantidade unitária e Tipo de Quantidade
+        /// </summary>
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(Resposta))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(Resposta))]
+        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(Resposta))]
+        [HttpPut("{barcode}")]
+        public async Task<ActionResult> PutProduct(string barcode, [FromBody] ProductPutDTO dto)
+        {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+
+            var product = await _dbContext.Products.FindAsync(barcode);
+            if (product == null) return NotFound(new Resposta($"Produto {barcode} não encontrado."));
+
+
+            using var transaction = await _dbContext.Database.BeginTransactionAsync();
+            try
+            {
+                // Nome
+                if (!string.IsNullOrWhiteSpace(dto.Name))
+                    product.Name = dto.Name;
+
+                // UnitSize
+                if (dto.UnitSize.HasValue) product.UnitSize = dto.UnitSize.Value;
+                
+
+                // Validação de tipo de unidade
+                if (dto.UnitId.HasValue)
+                {
+                    if (!(await _typesService.VerifyUnit(dto.UnitId.Value)))
+                    {
+                        throw new Exception("A unidade informada não existe.");
+                    }
+                    else
+                    {
+                        product.UnitId = dto.UnitId.Value;
+                    }
+                }
+
+                // Validação de categoria
+                if (dto.CategoryId.HasValue)
+                {
+                    if (!(await _typesService.VerifyCategory(dto.CategoryId.Value)))
+                    {
+                        throw new Exception("A categoria informada não existe.");
+                    }
+                    else
+                    {
+                        product.CategoryId = dto.CategoryId.Value;
+                    }
+                }
+
+                // Validação de Quantidade
+                if (dto.UnitSize.HasValue)
+                {
+                    product.UnitSize = dto.UnitSize.Value;
+                }
+
+                await _dbContext.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return Ok(new Resposta("Produto atualizado com sucesso."));
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                return StatusCode(StatusCodes.Status500InternalServerError, new Resposta("Erro ao atualizar o produto."));
             }
         }
 

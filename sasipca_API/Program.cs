@@ -40,7 +40,6 @@ namespace sasipca_API
             // Busca variáveis de ambiente de Base de dados e JWT
             var jwtKey = Environment.GetEnvironmentVariable("JWT_KEY");
             var connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_KEY");
-            var azureStorageKey = Environment.GetEnvironmentVariable("AZURE_STORAGE_KEY");
 
             // Variáveis do túnel SSH (Para acesso a servidor de Base de Dados)
             var sshHost = Environment.GetEnvironmentVariable("SSH_HOST");
@@ -59,16 +58,6 @@ namespace sasipca_API
                 throw new InvalidOperationException("DB_CONNECTION_KEY is not set in environment variables.");
             }
 
-            // Criar túnel SSH antes de iniciar a app
-            /*var sshClient = new SshClient(sshHost, sshPort, sshUser, sshPassword);
-            sshClient.Connect();
-            Console.WriteLine($"SSH conectado a {sshHost}:{sshPort}");
-
-            var portForward = new ForwardedPortLocal("127.0.0.1", localPort, "127.0.0.1", 3306);
-            sshClient.AddForwardedPort(portForward);
-            portForward.Start();*/
-
-
             var builder = WebApplication.CreateBuilder(args);
 
             //Adicionar dependências de Serviços.
@@ -84,6 +73,7 @@ namespace sasipca_API
             builder.Services.AddScoped<IFileStorageService, FileStorageService>();
             builder.Services.AddScoped<IJWTService, JWTService>();
             builder.Services.AddTransient<IEmailService, EmailService>();
+            builder.Services.AddTransient<ITypesService, TypesService>();
 
 
             builder.Services.AddSingleton<IConverter, SynchronizedConverter>(provider => new SynchronizedConverter(new PdfTools()));
@@ -342,22 +332,6 @@ namespace sasipca_API
             {
                 ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
             });
-
-            // Fecha o túnel SSH quando a app termina
-            /*app.Lifetime.ApplicationStopping.Register(() =>
-            {
-                try
-                {
-                    portForward.Stop();
-                    sshClient.Disconnect();
-                    sshClient.Dispose();
-                    Console.WriteLine("Túnel SSH fechado.");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Erro ao encerrar túnel SSH: {ex.Message}");
-                }
-            });*/
             app.Run();
         }
     }
