@@ -40,15 +40,9 @@ namespace sasipca_API
             // Busca variáveis de ambiente de Base de dados e JWT
             var jwtKey = Environment.GetEnvironmentVariable("JWT_KEY");
             var connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_KEY");
+            var azureClientId = Environment.GetEnvironmentVariable("AZURE_CLIENT_ID");
 
-            // Variáveis do túnel SSH (Para acesso a servidor de Base de Dados)
-            var sshHost = Environment.GetEnvironmentVariable("SSH_HOST");
-            var sshPort = int.Parse(Environment.GetEnvironmentVariable("SSH_PORT") ?? "2222");
-            var sshUser = Environment.GetEnvironmentVariable("SSH_USER");
-            var sshPassword = Environment.GetEnvironmentVariable("SSH_PASSWORD");
-            var localPort = uint.Parse(Environment.GetEnvironmentVariable("SSH_LOCAL_PORT") ?? "3306");
-
-            // Verifica se a chave JWT e a string de conexão estão presentes
+            // Verifica se as chaves estão presentes
             if (string.IsNullOrEmpty(jwtKey))
             {
                 throw new InvalidOperationException("JWT_KEY is not set in environment variables.");
@@ -56,6 +50,10 @@ namespace sasipca_API
             if (string.IsNullOrEmpty(connectionString))
             {
                 throw new InvalidOperationException("DB_CONNECTION_KEY is not set in environment variables.");
+            }
+            if (string.IsNullOrEmpty(azureClientId))
+            {
+                throw new InvalidOperationException("AZURE_CLIENT_ID is not set in environment variables.");
             }
 
             var builder = WebApplication.CreateBuilder(args);

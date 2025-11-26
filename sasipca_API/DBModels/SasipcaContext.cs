@@ -661,6 +661,7 @@ public partial class SasipcaContext : DbContext
             entity.HasIndex(e => e.Email, "email").IsUnique();
 
             entity.Property(e => e.Id)
+                .ValueGeneratedNever()
                 .HasColumnType("int(11)")
                 .HasColumnName("id");
             entity.Property(e => e.Contact).HasColumnName("contact");
@@ -672,9 +673,6 @@ public partial class SasipcaContext : DbContext
             entity.Property(e => e.Name)
                 .HasMaxLength(255)
                 .HasColumnName("name");
-            entity.Property(e => e.Password)
-                .HasMaxLength(255)
-                .HasColumnName("password");
             entity.Property(e => e.RefreshToken)
                 .HasMaxLength(255)
                 .HasColumnName("refresh_token");

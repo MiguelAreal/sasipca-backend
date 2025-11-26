@@ -15,7 +15,7 @@ public partial class VDelivery
 
     public int UserId { get; set; }
 
-    public string UserName { get; set; } = null!;
+    public string? UserName { get; set; }
 
     public int BeneficiaryId { get; set; }
 

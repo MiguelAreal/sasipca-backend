@@ -15,7 +15,7 @@ public partial class VMovHistory
 
     public int UserId { get; set; }
 
-    public string UserName { get; set; } = null!;
+    public string? UserName { get; set; }
 
     public int? DeliveryId { get; set; }
 
