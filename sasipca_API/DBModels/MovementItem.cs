@@ -9,11 +9,11 @@ public partial class MovementItem
 
     public int MovementId { get; set; }
 
-    public int ProductLotId { get; set; }
+    public int ProductGroupId { get; set; }
 
     public int Quantity { get; set; }
 
     public virtual Movement Movement { get; set; } = null!;
 
-    public virtual ProductLot ProductLot { get; set; } = null!;
+    public virtual ProductGroup ProductGroup { get; set; } = null!;
 }

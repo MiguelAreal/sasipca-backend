@@ -261,9 +261,9 @@ namespace sasipca_API.Services
             }
             else if (type == ReportTypesEnum.MovementDetails && data is List<VMovHistoryDetail> details)
             {
-                sb.AppendLine("ID Movimento;Tipo;Data;Barcode;Produto;Lote;Quantidade;Utilizador");
+                sb.AppendLine("ID Movimento;Tipo;Data;Barcode;Produto;Data de Validade;Quantidade;Utilizador");
                 foreach (var d in details)
-                    sb.AppendLine($"{d.MovementId};{d.MovementTypeId};{d.MovementDate:yyyy-MM-dd HH:mm};{d.ProductBarcode};{d.ProductName};{d.ProductLotNumber};{d.ItemQuantityAffected};{d.UserName}");
+                    sb.AppendLine($"{d.MovementId};{d.MovementTypeId};{d.MovementDate:yyyy-MM-dd HH:mm};{d.ProductBarcode};{d.ProductName};{d.GroupExpiryDate};{d.ItemQuantityAffected};{d.UserName}");
             }
 
             return Encoding.UTF8.GetBytes(sb.ToString());

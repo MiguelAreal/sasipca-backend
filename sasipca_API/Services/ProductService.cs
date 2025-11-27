@@ -18,7 +18,7 @@ namespace sasipca_API.Services
         {
             var searchTermLower = searchTerm?.ToLower() ?? string.Empty;
 
-            var totalStockData = await _dbcontext.VStockPerLots
+            var totalStockData = await _dbcontext.VStockPerGroups
                 .GroupBy(v => v.Barcode)
                 .Select(g => new
                 {
@@ -63,7 +63,7 @@ namespace sasipca_API.Services
             var searchTermLower = searchTerm?.ToLower() ?? string.Empty;
 
             // Agregar dados de stock da view VAvailableStockPerLot
-            var totalStockData = _dbcontext.VStockPerLots
+            var totalStockData = _dbcontext.VStockPerGroups
                 .GroupBy(v => v.Barcode)
                 .Select(g => new
                 {

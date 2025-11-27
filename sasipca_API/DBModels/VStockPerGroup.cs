@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace sasipca_API.DBModels;
 
-public partial class VStockPerLot
+public partial class VStockPerGroup
 {
     public string Barcode { get; set; } = null!;
 
@@ -15,9 +15,7 @@ public partial class VStockPerLot
 
     public int? UnitSize { get; set; }
 
-    public int ProductLotId { get; set; }
-
-    public string Lot { get; set; } = null!;
+    public int ProductGroupId { get; set; }
 
     public DateOnly ExpiryDate { get; set; }
 

@@ -9,7 +9,7 @@ public partial class DeliveryItem
 
     public int DeliveryId { get; set; }
 
-    public int ProductLotId { get; set; }
+    public int ProductGroupId { get; set; }
 
     public int Quantity { get; set; }
 
@@ -17,5 +17,5 @@ public partial class DeliveryItem
 
     public virtual Delivery Delivery { get; set; } = null!;
 
-    public virtual ProductLot ProductLot { get; set; } = null!;
+    public virtual ProductGroup ProductGroup { get; set; } = null!;
 }

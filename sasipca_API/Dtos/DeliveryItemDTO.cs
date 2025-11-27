@@ -15,10 +15,10 @@ namespace sasipca_API.Dtos
         public string Barcode { get; set; } = null!;
 
         /// <summary>
-        /// Lote específico do produto.
+        /// Data de expiração específica do produto.
         /// </summary>
-        [Required(ErrorMessage = "O número de Lote é obrigatório.")]
-        public string Lot { get; set; } = null!;
+        [Required(ErrorMessage = "Data de Expiração obrigatória.")]
+        public DateOnly ExpiryDate { get; set; }
 
         /// <summary>
         /// Quantidade a sair do lote.

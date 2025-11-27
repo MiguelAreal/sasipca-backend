@@ -14,10 +14,10 @@ namespace sasipca_API.Dtos
         public string Barcode { get; set; } = null!;
 
         /// <summary>
-        /// Identificador do lote a ser ajustado.
+        /// Identificador do grupo a ser ajustado.
         /// </summary>
-        [Required(ErrorMessage = "O Lote é obrigatório.")]
-        public string Lot { get; set; } = null!;
+        [Required(ErrorMessage = "O Grupo é obrigatório.")]
+        public int GroupId { get; set; }
 
         /// <summary>
         /// Quantidade a ser adicionada (valor positivo) ou removida (valor negativo) do stock.

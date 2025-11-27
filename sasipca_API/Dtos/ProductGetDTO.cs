@@ -49,7 +49,7 @@ namespace sasipca_API.Dtos
         /// </summary>
         public int? AvailableStock { get; set; }
 
-        public List<ProductLotDTO> ProductLots { get; set; } = new List<ProductLotDTO>();
+        public List<ProductGroupDTO> ProductGroups { get; set; } = new List<ProductGroupDTO>();
 
     }
 }

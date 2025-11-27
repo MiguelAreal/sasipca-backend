@@ -17,7 +17,7 @@ public partial class Product
 
     public virtual CategoryType Category { get; set; } = null!;
 
-    public virtual ICollection<ProductLot> ProductLots { get; set; } = new List<ProductLot>();
+    public virtual ICollection<ProductGroup> ProductGroups { get; set; } = new List<ProductGroup>();
 
     public virtual UnitType Unit { get; set; } = null!;
 }

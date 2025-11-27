@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using FluentAssertions;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using sasipca_API.DBModels;
 using sasipca_API.Dtos;
@@ -26,7 +27,7 @@ namespace sasipca_API.Services
         }
 
         // ====================================================================
-        // FUNÇÃO PRIVADA ABSTRAÍDA: PROCESSA ITENS, VALIDA STOCK E EXPIRAÇÃO
+        // FUNÇÃO PRIVADA ABSTRAÍDA: PROCESSA ITENS, VALIDA STOCK E VALIDADE
         // ====================================================================
         /// <summary>
         /// Processa a lista de itens de entrega: valida, cria DeliveryItems, e opcionalmente
@@ -43,30 +44,30 @@ namespace sasipca_API.Services
             List<DeliveryItemDTO> itemDtos,
             DateOnly scheduledDate,
             Movement? newMovement,
-            List<ProductLot> lotsToUpdate)
+            List<ProductGroup> lotsToUpdate)
         {
             var isDeductingStock = newMovement != null;
             var isScheduling = delivery.StatusId == (int)Enums.DeliveryStatus.Agendada;
 
             foreach (var itemDto in itemDtos)
             {
-                // Encontrar o lote pelo Barcode e Lot
-                var productLot = await _dbContext.ProductLots
+                // Encontrar o grupo pelo Barcode e data de expiração
+                var productGroup = await _dbContext.ProductGroups
                     .Include(pl => pl.BarcodeNavigation)
-                    .FirstOrDefaultAsync(pl => pl.Barcode == itemDto.Barcode && pl.Lot == itemDto.Lot);
+                    .FirstOrDefaultAsync(pl => pl.Barcode == itemDto.Barcode && pl.ExpiryDate == itemDto.ExpiryDate);
 
-                if (productLot == null)
+                if (productGroup == null)
                 {
-                    return (false, new Resposta($"Lote '{itemDto.Lot}' do produto '{itemDto.Barcode}' não encontrado."));
+                    return (false, new Resposta($"Grupo do produto '{itemDto.Barcode}' não encontrado."));
                 }
 
                 // 1. VALIDAÇÃO DE EXPIRAÇÃO (Apenas para agendamento)
                 if (isScheduling)
                 {
                     // Bloquear se a data de validade for ANTES ou NO DIA da entrega agendada.
-                    if (productLot.ExpiryDate <= scheduledDate)
+                    if (productGroup.ExpiryDate <= scheduledDate)
                     {
-                        return (false, new Resposta($"Agendamento bloqueado. O produto '{productLot.BarcodeNavigation.Name}' (Lote: {itemDto.Lot}, Válido até: {productLot.ExpiryDate:yyyy-MM-dd}) expira antes ou no dia ({scheduledDate:yyyy-MM-dd}) da entrega agendada."));
+                        return (false, new Resposta($"Agendamento bloqueado. O produto '{productGroup.BarcodeNavigation.Name}' expira antes ou no dia da entrega agendada."));
                     }
                 }
 
@@ -74,38 +75,38 @@ namespace sasipca_API.Services
 
                 // 2.1. Obter a quantidade TOTAL reservada (excluindo a entrega atual, se for atualização)
                 var reservedQuantity = await _dbContext.DeliveryItems
-                    .Where(di => di.ProductLotId == productLot.Id
+                    .Where(di => di.ProductGroupId == productGroup.Id
                             && di.Delivery.StatusId == (int)Enums.DeliveryStatus.Agendada
                             && di.DeliveryId != delivery.Id) // Excluir reservas desta mesma entrega se for UPDATE
                     .SumAsync(di => di.Quantity);
 
-                var availableStock = productLot.Quantity - reservedQuantity;
+                var availableStock = productGroup.Quantity - reservedQuantity;
 
                 // 2.2. Validação: Stock Disponível vs. Quantidade Solicitada
                 if (availableStock < itemDto.Quantity)
                 {
-                    return (false, new Resposta($"Stock insuficiente para reserva/saída. Produto '{productLot.BarcodeNavigation.Name}' (Lote: {itemDto.Lot}). Stock Disponível: {availableStock}, Quantidade solicitada: {itemDto.Quantity}."));
+                    return (false, new Resposta($"Stock insuficiente para reserva/saída. Produto '{productGroup.BarcodeNavigation.Name}' (Stock Disponível: {availableStock}, Quantidade solicitada: {itemDto.Quantity}."));
                 }
 
                 // 3. CRIAÇÃO DO DELIVERY ITEM
                 delivery.DeliveryItems.Add(new DeliveryItem
                 {
                     DeliveryId = delivery.Id,
-                    ProductLotId = productLot.Id,
+                    ProductGroupId = productGroup.Id,
                     Quantity = (int)itemDto.Quantity
                 });
 
                 // 4. DEDUÇÃO DE STOCK e LOG (Apenas se for Saída Imediata)
                 if (isDeductingStock)
                 {
-                    productLot.Quantity -= (int)itemDto.Quantity;
-                    lotsToUpdate.Add(productLot); // Marcar para atualização em lote
+                    productGroup.Quantity -= (int)itemDto.Quantity;
+                    lotsToUpdate.Add(productGroup); // Marcar para atualização em lote
 
                     if (newMovement != null)
                     {
                         newMovement.MovementItems.Add(new MovementItem
                         {
-                            ProductLot = productLot,
+                            ProductGroup = productGroup,
                             Quantity = -(int)itemDto.Quantity // Negativo para Saída
                         });
                     }
@@ -151,7 +152,7 @@ namespace sasipca_API.Services
 
                 // 3. Criar o cabeçalho da Movimentação
                 Movement? newMovement = null;
-                var lotsToUpdate = new List<ProductLot>();
+                var lotsToUpdate = new List<ProductGroup>();
 
                 // Se for para deduzir stock (é uma saída espontânea)
                 if (deductStock)
@@ -183,15 +184,15 @@ namespace sasipca_API.Services
                 // 5. Finalizar transação
                 if (deductStock && newMovement != null)
                 {
-                    _dbContext.ProductLots.UpdateRange(lotsToUpdate);
+                    _dbContext.ProductGroups.UpdateRange(lotsToUpdate);
                 }
 
                 await _dbContext.SaveChangesAsync();
                 await transaction.CommitAsync();
 
                 var message = initialStatus == Enums.DeliveryStatus.Entregue
-                    ? $"Entrega imediata ID {newDelivery.Id} registada e stock deduzido."
-                    : $"Entrega agendada ID {newDelivery.Id} programada com sucesso.";
+                    ? $"Entrega imediata registada e stock deduzido."
+                    : $"Entrega agendada com sucesso.";
 
                 return (true, new Resposta(message));
             }
@@ -234,7 +235,7 @@ namespace sasipca_API.Services
 
                 // Variáveis para atualização
                 var newScheduledDate = dto.ScheduledDate ?? delivery.ScheduledDate;
-                var lotsToUpdate = new List<ProductLot>();
+                var lotsToUpdate = new List<ProductGroup>();
                 Movement? newMovement = null;
 
                 // 3. PROCESSAMENTO DA TRANSIÇÃO DE ESTADO
@@ -303,7 +304,7 @@ namespace sasipca_API.Services
                 // 4. Finalizar transação
                 if (newMovement != null)
                 {
-                    _dbContext.ProductLots.UpdateRange(lotsToUpdate);
+                    _dbContext.ProductGroups.UpdateRange(lotsToUpdate);
                 }
 
                 await _dbContext.SaveChangesAsync();

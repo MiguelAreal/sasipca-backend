@@ -13,9 +13,9 @@ namespace sasipca_API.Dtos
         [Required(ErrorMessage = "O Barcode é obrigatório.")]
         public string Barcode { get; set; } = null!;
 
-        [Required(ErrorMessage = "A lista de Itens de Lote é obrigatória e deve ter pelo menos um item.")]
-        [MinLength(1, ErrorMessage = "A lista de Itens de Lote deve conter pelo menos um item.")]
-        public List<LotReceiptItemDTO> Lots { get; set; } = new List<LotReceiptItemDTO>();
+        [Required(ErrorMessage = "A lista de Itens de Grupo é obrigatória e deve ter pelo menos um item.")]
+        [MinLength(1, ErrorMessage = "A lista de Itens de Grupo deve conter pelo menos um item.")]
+        public List<GroupReceiptItemDTO> Groups { get; set; } = new List<GroupReceiptItemDTO>();
 
         // --- Campos de Criação do Produto (Opcionais, mas necessários se o produto não existir) ---
         // Se o produto não existir, a validação de negócio irá exigir estes campos.
@@ -24,7 +24,7 @@ namespace sasipca_API.Dtos
         public int? UnitId { get; set; }
 
         /// <summary>
-        /// Quantidade por unidade (ex: 1000g, 250ml). Valor padrão 1.
+        /// Quantidade por unidade (ex: 1000g, 250ml). Valor default 1.
         /// </summary>
         public int UnitSize { get; set; } = 1;
 

@@ -39,7 +39,7 @@ public partial class SasipcaContext : DbContext
 
     public virtual DbSet<Product> Products { get; set; }
 
-    public virtual DbSet<ProductLot> ProductLots { get; set; }
+    public virtual DbSet<ProductGroup> ProductGroups { get; set; }
 
     public virtual DbSet<Report> Reports { get; set; }
 
@@ -59,7 +59,7 @@ public partial class SasipcaContext : DbContext
 
     public virtual DbSet<VMovHistoryDetail> VMovHistoryDetails { get; set; }
 
-    public virtual DbSet<VStockPerLot> VStockPerLots { get; set; }
+    public virtual DbSet<VStockPerGroup> VStockPerGroups { get; set; }
 
     public virtual DbSet<VStockPerProduct> VStockPerProducts { get; set; }
 
@@ -274,7 +274,7 @@ public partial class SasipcaContext : DbContext
 
             entity.HasIndex(e => e.DeliveryId, "delivery_items_fk1");
 
-            entity.HasIndex(e => e.ProductLotId, "delivery_items_fk2");
+            entity.HasIndex(e => e.ProductGroupId, "delivery_items_fk2");
 
             entity.Property(e => e.Id)
                 .HasColumnType("int(11)")
@@ -286,9 +286,9 @@ public partial class SasipcaContext : DbContext
             entity.Property(e => e.DeliveryId)
                 .HasColumnType("int(11)")
                 .HasColumnName("delivery_id");
-            entity.Property(e => e.ProductLotId)
+            entity.Property(e => e.ProductGroupId)
                 .HasColumnType("int(11)")
-                .HasColumnName("product_lot_id");
+                .HasColumnName("product_group_id");
             entity.Property(e => e.Quantity)
                 .HasColumnType("int(11)")
                 .HasColumnName("quantity");
@@ -297,8 +297,8 @@ public partial class SasipcaContext : DbContext
                 .HasForeignKey(d => d.DeliveryId)
                 .HasConstraintName("delivery_items_fk1");
 
-            entity.HasOne(d => d.ProductLot).WithMany(p => p.DeliveryItems)
-                .HasForeignKey(d => d.ProductLotId)
+            entity.HasOne(d => d.ProductGroup).WithMany(p => p.DeliveryItems)
+                .HasForeignKey(d => d.ProductGroupId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("delivery_items_fk2");
         });
@@ -382,7 +382,7 @@ public partial class SasipcaContext : DbContext
 
             entity.HasIndex(e => e.MovementId, "FK_mov_id");
 
-            entity.HasIndex(e => e.ProductLotId, "FK_prod_lot_id");
+            entity.HasIndex(e => e.ProductGroupId, "FK_prod_lot_id");
 
             entity.Property(e => e.Id)
                 .HasColumnType("int(11)")
@@ -390,9 +390,9 @@ public partial class SasipcaContext : DbContext
             entity.Property(e => e.MovementId)
                 .HasColumnType("int(11)")
                 .HasColumnName("movement_id");
-            entity.Property(e => e.ProductLotId)
+            entity.Property(e => e.ProductGroupId)
                 .HasColumnType("int(11)")
-                .HasColumnName("product_lot_id");
+                .HasColumnName("product_group_id");
             entity.Property(e => e.Quantity)
                 .HasColumnType("int(11)")
                 .HasColumnName("quantity");
@@ -401,10 +401,10 @@ public partial class SasipcaContext : DbContext
                 .HasForeignKey(d => d.MovementId)
                 .HasConstraintName("FK_mov_id");
 
-            entity.HasOne(d => d.ProductLot).WithMany(p => p.MovementItems)
-                .HasForeignKey(d => d.ProductLotId)
+            entity.HasOne(d => d.ProductGroup).WithMany(p => p.MovementItems)
+                .HasForeignKey(d => d.ProductGroupId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_prod_lot_id");
+                .HasConstraintName("FK_prod_group_id");
         });
 
         modelBuilder.Entity<MovementType>(entity =>
@@ -538,25 +538,24 @@ public partial class SasipcaContext : DbContext
                 .HasConstraintName("FK_products_unit_types");
         });
 
-        modelBuilder.Entity<ProductLot>(entity =>
+        modelBuilder.Entity<ProductGroup>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity.ToTable("product_lot");
+            entity.ToTable("product_group");
 
-            entity.HasIndex(e => new { e.Barcode, e.Lot }, "barcode").IsUnique();
+            entity.HasIndex(e => new { e.Barcode, e.ExpiryDate }, "barcode").IsUnique();
 
             entity.Property(e => e.Id)
                 .HasColumnType("int(11)")
                 .HasColumnName("id");
             entity.Property(e => e.Barcode).HasColumnName("barcode");
             entity.Property(e => e.ExpiryDate).HasColumnName("expiry_date");
-            entity.Property(e => e.Lot).HasColumnName("lot");
             entity.Property(e => e.Quantity)
                 .HasColumnType("int(11)")
                 .HasColumnName("quantity");
 
-            entity.HasOne(d => d.BarcodeNavigation).WithMany(p => p.ProductLots)
+            entity.HasOne(d => d.BarcodeNavigation).WithMany(p => p.ProductGroups)
                 .HasForeignKey(d => d.Barcode)
                 .HasConstraintName("FK_barcode");
         });
@@ -690,23 +689,6 @@ public partial class SasipcaContext : DbContext
             entity
                 .HasNoKey()
                 .ToView("v_deliveries_details");
-
-            entity.Property(e => e.BeneficiaryId).HasColumnType("int(11)");
-            entity.Property(e => e.BeneficiaryName).HasMaxLength(50);
-            entity.Property(e => e.DeliveryId).HasColumnType("int(11)");
-            entity.Property(e => e.DeliveryItemId).HasColumnType("int(11)");
-            entity.Property(e => e.ItemCreatedAt)
-                .HasDefaultValueSql("current_timestamp()")
-                .HasColumnType("timestamp");
-            entity.Property(e => e.ItemQuantity).HasColumnType("int(11)");
-            entity.Property(e => e.Note).HasColumnType("text");
-            entity.Property(e => e.ProductBarcode).HasMaxLength(255);
-            entity.Property(e => e.ProductLotId).HasColumnType("int(11)");
-            entity.Property(e => e.ProductLotNumber).HasMaxLength(255);
-            entity.Property(e => e.ProductName).HasMaxLength(255);
-            entity.Property(e => e.StatusId).HasColumnType("int(11)");
-            entity.Property(e => e.UserId).HasColumnType("int(11)");
-            entity.Property(e => e.UserName).HasMaxLength(255);
         });
 
         modelBuilder.Entity<VDelivery>(entity =>
@@ -758,25 +740,23 @@ public partial class SasipcaContext : DbContext
             entity.Property(e => e.MovementNote).HasColumnType("text");
             entity.Property(e => e.MovementTypeId).HasColumnType("int(11)");
             entity.Property(e => e.ProductBarcode).HasMaxLength(255);
-            entity.Property(e => e.ProductLotId).HasColumnType("int(11)");
-            entity.Property(e => e.ProductLotNumber).HasMaxLength(255);
+            entity.Property(e => e.ProductGroupId).HasColumnType("int(11)");
             entity.Property(e => e.ProductName).HasMaxLength(255);
             entity.Property(e => e.UserId).HasColumnType("int(11)");
             entity.Property(e => e.UserName).HasMaxLength(255);
         });
 
-        modelBuilder.Entity<VStockPerLot>(entity =>
+        modelBuilder.Entity<VStockPerGroup>(entity =>
         {
             entity
                 .HasNoKey()
-                .ToView("v_stock_per_lot");
+                .ToView("v_stock_per_group");
 
             entity.Property(e => e.AvailableStock).HasPrecision(33);
             entity.Property(e => e.Barcode).HasMaxLength(255);
             entity.Property(e => e.CategoryId).HasColumnType("int(11)");
-            entity.Property(e => e.Lot).HasMaxLength(255);
             entity.Property(e => e.Name).HasMaxLength(255);
-            entity.Property(e => e.ProductLotId).HasColumnType("int(11)");
+            entity.Property(e => e.ProductGroupId).HasColumnType("int(11)");
             entity.Property(e => e.ReservedQuantity).HasPrecision(32);
             entity.Property(e => e.TotalQuantity).HasColumnType("int(11)");
             entity.Property(e => e.UnitId).HasColumnType("int(11)");

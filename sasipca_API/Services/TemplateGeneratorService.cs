@@ -102,11 +102,11 @@ namespace sasipca_API.Services
             }
             else if (type == ReportTypesEnum.MovementDetails && data is List<VMovHistoryDetail> movdetails)
             {
-                sb.AppendLine("<tr><th>Código de Barras</th><th>Produto</th><th>Lote</th><th>Validade</th><th class='align-right'>Qtd</th></tr>");
+                sb.AppendLine("<tr><th>Código de Barras</th><th>Produto</th><th>Data de Validade</th><th class='align-right'>Qtd</th></tr>");
                 sb.AppendLine("</thead><tbody>");
                 foreach (var d in movdetails)
                 {
-                    sb.AppendLine($"<tr><td>{d.ProductBarcode}</td><td>{d.ProductName}</td><td>{d.ProductLotNumber}</td><td>{d.LotExpiryDate.ToString("dd-MM-yyyy")}</td><td class='align-right'>{d.ItemQuantityAffected}</td></tr>");
+                    sb.AppendLine($"<tr><td>{d.ProductBarcode}</td><td>{d.ProductName}</td><td>{d.GroupExpiryDate.ToString("dd-MM-yyyy")}</td><td class='align-right'>{d.ItemQuantityAffected}</td></tr>");
                 }
             }
 

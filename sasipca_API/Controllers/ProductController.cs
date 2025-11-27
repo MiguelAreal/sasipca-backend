@@ -138,7 +138,7 @@ namespace sasipca_API.Controllers
             try
             {
                 // 1. Busca os dados da View para o produto específico (traz todos os lotes)
-                var stockData = await _dbContext.VStockPerLots
+                var stockData = await _dbContext.VStockPerGroups
                     .Where(v => v.Barcode == barcode)
                     .ToListAsync();
 
@@ -179,7 +179,7 @@ namespace sasipca_API.Controllers
                             UnitSize = p.UnitSize,
                             CategoryId = p.Category.Id,
                             UnitId = p.Unit.Id,
-                            ProductLots = new List<ProductLotDTO>(),
+                            ProductGroups = new List<ProductGroupDTO>(),
                             TotalQuantity = 0,
                             ReservedQuantity = 0,
                             AvailableStock = 0
@@ -188,15 +188,14 @@ namespace sasipca_API.Controllers
                     return Ok(simpleProduct);
                 }
 
-                // 3. Mapeamento: Cria a lista de lotes (ProductLots) e o DTO principal.
-                var productLotsDto = stockData.Select(lotData => new ProductLotDTO
+                // 3. Mapeamento: Cria a lista de grupos (ProductGroups) e o DTO principal.
+                var productGroupsDto = stockData.Select(groupData => new ProductGroupDTO
                 {
-                    Id = lotData.ProductLotId,
-                    Lot = lotData.Lot,
-                    ExpiryDate = lotData.ExpiryDate,
-                    TotalQuantity = lotData.TotalQuantity,
-                    ReservedQuantity = (int)lotData.ReservedQuantity, // Cast necessário
-                    AvailableStock = (int)lotData.AvailableStock      // Cast necessário
+                    Id = groupData.ProductGroupId,
+                    ExpiryDate = groupData.ExpiryDate,
+                    TotalQuantity = groupData.TotalQuantity,
+                    ReservedQuantity = (int)groupData.ReservedQuantity, // Cast necessário
+                    AvailableStock = (int)groupData.AvailableStock      // Cast necessário
                 }).ToList();
 
                 var productDto = new ProductGetDTO
@@ -213,7 +212,7 @@ namespace sasipca_API.Controllers
                     AvailableStock = (int)totalStock.AvailableStock,
 
                     // Lista Aninhada
-                    ProductLots = productLotsDto
+                    ProductGroups= productGroupsDto
                 };
 
                 return Ok(productDto);

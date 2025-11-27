@@ -10,6 +10,7 @@ using sasipca_API.Services.Interfaces;
 using sasipca_API.Enumerators;
 using sasipca_API.Dtos;
 using sasipca_API.DBModels;
+using FluentAssertions;
 
 namespace sasipca_API.Controllers
 {
@@ -42,7 +43,7 @@ namespace sasipca_API.Controllers
         // ----------------------------------------------------
         /// <summary>
         /// Regista uma Entrada de Stock. Pode criar um novo Produto e o seu stock inicial
-        /// ou adicionar stock a lotes de um Produto já existente.
+        /// ou adicionar stock a grupos de um Produto já existente.
         /// </summary>
         [HttpPost("receipts")]
         [ProducesResponseType(StatusCodes.Status201Created)]
@@ -73,7 +74,6 @@ namespace sasipca_API.Controllers
                 if (isNewProduct)
                 {
                     // Produto não existe. É obrigatório fornecer todos os dados mestre.
-                    // Estou a assumir que 'dto' tem estas propriedades como 'string?', 'int?' etc.
                     if (string.IsNullOrEmpty(dto.Name) || dto.CategoryId == null || dto.UnitId == null)
                     {
                         await transaction.RollbackAsync();
@@ -145,48 +145,42 @@ namespace sasipca_API.Controllers
                 await _dbContext.SaveChangesAsync();
 
 
-                // 4. Processar Lotes
-                foreach (var itemDto in dto.Lots)
+                // 4. Processar Grupos
+                foreach (var itemDto in dto.Groups)
                 {
-                    // Validação de lote: a quantidade tem que ser positiva para entrada
+                    // Validação de grupo: a quantidade tem que ser positiva para entrada
                     if (itemDto.Quantity <= 0)
                     {
                         await transaction.RollbackAsync();
-                        return BadRequest(new Resposta($"A quantidade para o lote '{itemDto.Lot}' deve ser positiva."));
+                        return BadRequest(new Resposta($"A quantidade para o grupo deve ser positiva."));
                     }
 
-                    var productLot = await _dbContext.ProductLots
-                        .FirstOrDefaultAsync(pl => pl.Barcode == barcode && pl.Lot == itemDto.Lot);
+                    var productGroup = await _dbContext.ProductGroups
+                        .FirstOrDefaultAsync(pl => pl.Barcode == barcode && pl.ExpiryDate == itemDto.ExpiryDate);
 
-                    if (productLot != null)
+                    if (productGroup != null)
                     {
-                        // Lote existe: Apenas adiciona a quantidade
-                        productLot.Quantity += itemDto.Quantity;
+                        // Grupo existe: Apenas adiciona a quantidade
+                        productGroup.Quantity += itemDto.Quantity;
 
-                        // Se o lote for o mesmo, atualiza a data de expiração apenas quando a introduzida é maior.
-                        if (productLot.ExpiryDate < DateOnly.FromDateTime(itemDto.ExpiryDate))
-                        {
-                            productLot.ExpiryDate = DateOnly.FromDateTime(itemDto.ExpiryDate);
-                        }
                     }
                     else
                     {
-                        // Lote não existe: Cria novo lote
-                        productLot = new ProductLot
+                        // Grupo não existe: Cria novo grupo
+                        productGroup = new ProductGroup
                         {
                             Barcode = barcode,
-                            Lot = itemDto.Lot,
                             Quantity = itemDto.Quantity,
-                            ExpiryDate = DateOnly.FromDateTime(itemDto.ExpiryDate)
+                            ExpiryDate = itemDto.ExpiryDate
                         };
-                        _dbContext.ProductLots.Add(productLot);
+                        _dbContext.ProductGroups.Add(productGroup);
                     }
 
                     // 5. Criar o Item da Movimentação
                     newMovement.MovementItems.Add(new MovementItem
                     {
-                        // Usa a instância productLot que foi criada ou carregada
-                        ProductLot = productLot,
+                        // Usa a instância productGroup que foi criada ou carregada
+                        ProductGroup = productGroup,
                         Quantity = itemDto.Quantity
                     });
                 }
@@ -195,7 +189,7 @@ namespace sasipca_API.Controllers
                 await transaction.CommitAsync();
 
                 var successMessage = isNewProduct
-                    ? $"Produto '{dto.Name}' e lote(s) inicial(is) registados com sucesso."
+                    ? $"Produto '{dto.Name}' e grupo(s) inicial(is) registados com sucesso."
                     : $"Entrada de stock para o produto '{barcode}' concluída com sucesso.";
 
                 return StatusCode(StatusCodes.Status201Created, new Resposta(successMessage));
@@ -234,15 +228,15 @@ namespace sasipca_API.Controllers
 
             try
             {
-                // 1. Encontrar o lote específico
-                var productLot = await _dbContext.ProductLots
+                // 1. Encontrar o grupo específico
+                var productGroup = await _dbContext.ProductGroups
                     .Include(pl => pl.BarcodeNavigation)
-                    .FirstOrDefaultAsync(pl => pl.Barcode == dto.Barcode && pl.Lot == dto.Lot);
+                    .FirstOrDefaultAsync(pl => pl.Barcode == dto.Barcode && pl.Id == dto.GroupId);
 
-                if (productLot == null)
+                if (productGroup == null)
                 {
                     await transaction.RollbackAsync();
-                    return NotFound(new Resposta($"Produto/Lote '{dto.Barcode}' - '{dto.Lot}' não encontrado."));
+                    return NotFound(new Resposta($"Produto/Grupo '{dto.Barcode}' - '{dto.GroupId}' não encontrado."));
                 }
 
                 var adjustment = dto.QuantityAdjustment;
@@ -255,11 +249,11 @@ namespace sasipca_API.Controllers
                     // 2.1. Calcular Stock Reservado
                     // Stock reservado são todas as DeliveryItems em Deliveries com StatusId = Agendada (1)
                     var reservedQuantity = await _dbContext.DeliveryItems
-                        .Where(di => di.ProductLotId == productLot.Id && di.Delivery.StatusId == (int)Enums.DeliveryStatus.Agendada)
+                        .Where(di => di.ProductGroupId == productGroup.Id && di.Delivery.StatusId == (int)Enums.DeliveryStatus.Agendada)
                         .SumAsync(di => di.Quantity);
 
                     // 2.2. Calcular Stock Disponível (Total - Reservado)
-                    var availableStock = productLot.Quantity - reservedQuantity;
+                    var availableStock = productGroup.Quantity - reservedQuantity;
 
                     // 2.3. Validação: A quantidade a remover não pode exceder o stock disponível.
                     if (availableStock < quantityToAdjust)
@@ -270,7 +264,7 @@ namespace sasipca_API.Controllers
                 }
 
                 // 3. Aplicar o Ajuste ao Lote (ProductLot)
-                productLot.Quantity += adjustment;
+                productGroup.Quantity += adjustment;
 
                 // 4. Criar a Movimentação (Movement)
                 var newMovement = new Movement
@@ -285,7 +279,7 @@ namespace sasipca_API.Controllers
                 // 5. Criar o Item da Movimentação (MovementItem)
                 newMovement.MovementItems.Add(new MovementItem
                 {
-                    ProductLot = productLot, // Lote atualizado
+                    ProductGroup = productGroup, // Lote atualizado
                     Quantity = adjustment
                 });
 
@@ -293,7 +287,7 @@ namespace sasipca_API.Controllers
                 await transaction.CommitAsync();
 
                 var action = isReduction ? "removida" : "adicionada";
-                return Ok(new Resposta($"Ajuste de stock concluído. Quantidade de {quantityToAdjust} {action} do produto '{productLot.BarcodeNavigation.Name}' (Lote: {dto.Lot})."));
+                return Ok(new Resposta($"Ajuste de stock concluído. Quantidade de {quantityToAdjust} {action} do produto '{productGroup.BarcodeNavigation.Name}'."));
             }
             catch (Exception ex)
             {

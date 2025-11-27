@@ -64,12 +64,12 @@ namespace sasipca_API.Controllers
            var details = await _dbContext.VMovHistoryDetails
                 .Where(d => d.MovementId == movementId)
                 .OrderBy(d => d.ProductBarcode) // Ordena os itens para consistência
-                .ThenBy(d => d.ProductLotNumber)
+                .ThenBy(d => d.ProductGroupId)
                 .ToListAsync();
 
             if (!details.Any())
             {
-                return NotFound(new Resposta($"Movimento com ID {movementId} não encontrado."));
+                return NotFound(new Resposta($"Movimento não encontrado."));
             }
 
             // Mapeamento para um DTO de resposta estruturado (melhora a legibilidade da API)
@@ -136,7 +136,7 @@ namespace sasipca_API.Controllers
         /// </summary>
         /// <param name="deliveryID">ID da entrega.</param>
         /// <returns>Objeto contendo o cabeçalho da entrega e uma lista dos seus itens.</returns>
-        [HttpGet("deliveries/{deliveryId}")]
+        /*[HttpGet("deliveries/{deliveryId}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DeliveryDetailDTO))]
         [ProducesResponseType(StatusCodes.Status401Unauthorized, Type = typeof(Resposta))]
         [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(Resposta))]
@@ -156,7 +156,7 @@ namespace sasipca_API.Controllers
             var structuredResponse = MapDeliveryDetails(details);
 
             return Ok(structuredResponse);
-        }
+        }*/
 
 
 
@@ -195,8 +195,8 @@ namespace sasipca_API.Controllers
                     ItemQuantityAffected = d.ItemQuantityAffected,
                     ProductBarcode = d.ProductBarcode,
                     ProductName = d.ProductName,
-                    ProductLotNumber = d.ProductLotNumber,
-                    LotExpiryDate = d.LotExpiryDate
+                    ProductGroupId = d.ProductGroupId,
+                    GroupExpiryDate = d.GroupExpiryDate
                 }).ToList()
             };
         }
@@ -207,7 +207,7 @@ namespace sasipca_API.Controllers
         /// <summary>
         /// Mapeia a lista plana de detalhes da View para um objeto estruturado.
         /// </summary>
-        private DeliveryDetailDTO MapDeliveryDetails(List<VDeliveriesDetail> details)
+        /*private DeliveryDetailDTO MapDeliveryDetails(List<VDeliveriesDetail> details)
         {
             var header = details.First();
 
@@ -235,7 +235,7 @@ namespace sasipca_API.Controllers
                     Quantity = d.ItemQuantity
                 }).ToList()
             };
-        }
+        }*/
 
 
 

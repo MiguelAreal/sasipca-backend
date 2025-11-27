@@ -27,8 +27,8 @@ namespace sasipca_API.Dtos
         public int UnitSize { get; set; } = 1;
 
         // --- Dados do Lote Inicial ---
-        [Required(ErrorMessage = "Os dados do Lote inicial são obrigatórios para a criação do produto.")]
-        public LotReceiptItemDTO InitialLot { get; set; } = null!;
+        [Required(ErrorMessage = "Os dados do Grupo inicial são obrigatórios para a criação do produto.")]
+        public GroupReceiptItemDTO InitialGroup { get; set; } = null!;
 
         /// <summary>
         /// Notas ou observações sobre a entrada (opcional).
