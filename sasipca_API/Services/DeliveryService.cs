@@ -37,14 +37,14 @@ namespace sasipca_API.Services
         /// <param name="itemDtos">Os itens a serem processados.</param>
         /// <param name="scheduledDate">A data agendada para validação de expiração.</param>
         /// <param name="newMovement">A instância do Movement para log (ou null se não houver dedução).</param>
-        /// <param name="lotsToUpdate">Lista para acumular lotes a serem atualizados (dedução).</param>
+        /// <param name="groupsToUpdate">Lista para acumular grupos a serem atualizados (dedução).</param>
         /// <returns>Tuplo com sucesso e Resposta (se falhar).</returns>
         private async Task<(bool success, Resposta? response)> ProcessDeliveryItems(
             Delivery delivery,
             List<DeliveryItemDTO> itemDtos,
             DateOnly scheduledDate,
             Movement? newMovement,
-            List<ProductGroup> lotsToUpdate)
+            List<ProductGroup> groupsToUpdate)
         {
             var isDeductingStock = newMovement != null;
             var isScheduling = delivery.StatusId == (int)Enums.DeliveryStatus.Agendada;
@@ -100,7 +100,7 @@ namespace sasipca_API.Services
                 if (isDeductingStock)
                 {
                     productGroup.Quantity -= (int)itemDto.Quantity;
-                    lotsToUpdate.Add(productGroup); // Marcar para atualização em lote
+                    groupsToUpdate.Add(productGroup); // Marcar para atualização em lote
 
                     if (newMovement != null)
                     {
@@ -152,7 +152,7 @@ namespace sasipca_API.Services
 
                 // 3. Criar o cabeçalho da Movimentação
                 Movement? newMovement = null;
-                var lotsToUpdate = new List<ProductGroup>();
+                var groupsToUpdate = new List<ProductGroup>();
 
                 // Se for para deduzir stock (é uma saída espontânea)
                 if (deductStock)
@@ -173,7 +173,7 @@ namespace sasipca_API.Services
                     dto.ItemsToDeliver,
                     dto.ScheduledDate,
                     newMovement,
-                    lotsToUpdate);
+                    groupsToUpdate);
 
                 if (!success)
                 {
@@ -184,7 +184,7 @@ namespace sasipca_API.Services
                 // 5. Finalizar transação
                 if (deductStock && newMovement != null)
                 {
-                    _dbContext.ProductGroups.UpdateRange(lotsToUpdate);
+                    _dbContext.ProductGroups.UpdateRange(groupsToUpdate);
                 }
 
                 await _dbContext.SaveChangesAsync();
@@ -235,7 +235,7 @@ namespace sasipca_API.Services
 
                 // Variáveis para atualização
                 var newScheduledDate = dto.ScheduledDate ?? delivery.ScheduledDate;
-                var lotsToUpdate = new List<ProductGroup>();
+                var groupsToUpdate = new List<ProductGroup>();
                 Movement? newMovement = null;
 
                 // 3. PROCESSAMENTO DA TRANSIÇÃO DE ESTADO
@@ -265,7 +265,7 @@ namespace sasipca_API.Services
                         dto.ItemsToDeliver,
                         newScheduledDate,
                         newMovement,
-                        lotsToUpdate);
+                        groupsToUpdate);
 
                     if (!success)
                     {
@@ -287,7 +287,7 @@ namespace sasipca_API.Services
                         dto.ItemsToDeliver,
                         newScheduledDate,
                         null, // newMovement = null -> SEM DEDUÇÃO
-                        lotsToUpdate);
+                        groupsToUpdate);
 
                     if (!success)
                     {
@@ -304,7 +304,7 @@ namespace sasipca_API.Services
                 // 4. Finalizar transação
                 if (newMovement != null)
                 {
-                    _dbContext.ProductGroups.UpdateRange(lotsToUpdate);
+                    _dbContext.ProductGroups.UpdateRange(groupsToUpdate);
                 }
 
                 await _dbContext.SaveChangesAsync();

@@ -5,7 +5,7 @@ namespace sasipca_API.Dtos
     /// <summary>
     /// Payload unificado para registar Entrada de Stock.
     /// Pode criar um novo Produto (se 'Name', 'CategoryId', etc. forem fornecidos e o Barcode for novo)
-    /// ou adicionar stock a um Produto existente (apenas 'Barcode' e 'LotsToEnter' são necessários).
+    /// ou adicionar stock a um Produto existente (apenas 'Barcode' e 'GroupsToUpdate' são necessários).
     /// </summary>
     public class StockReceiptDTO
     {
