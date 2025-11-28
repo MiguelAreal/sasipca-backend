@@ -45,8 +45,6 @@ public partial class SasipcaContext : DbContext
 
     public virtual DbSet<ReportType> ReportTypes { get; set; }
 
-    public virtual DbSet<TokenResetPassword> TokenResetPasswords { get; set; }
-
     public virtual DbSet<UnitType> UnitTypes { get; set; }
 
     public virtual DbSet<User> Users { get; set; }
@@ -181,10 +179,10 @@ public partial class SasipcaContext : DbContext
                 .HasMaxLength(100)
                 .HasColumnName("image_url");
             entity.Property(e => e.Location)
-                .HasMaxLength(50)
+                .HasMaxLength(150)
                 .HasColumnName("location");
             entity.Property(e => e.Name)
-                .HasMaxLength(50)
+                .HasMaxLength(80)
                 .HasColumnName("name");
             entity.Property(e => e.StartDate).HasColumnName("start_date");
             entity.Property(e => e.UpdatedAt)
@@ -612,29 +610,6 @@ public partial class SasipcaContext : DbContext
                 .HasColumnName("type");
         });
 
-        modelBuilder.Entity<TokenResetPassword>(entity =>
-        {
-            entity.HasKey(e => e.UserId).HasName("PRIMARY");
-
-            entity.ToTable("token_reset_password");
-
-            entity.Property(e => e.UserId)
-                .ValueGeneratedNever()
-                .HasColumnType("int(11)")
-                .HasColumnName("user_id");
-            entity.Property(e => e.ExpDate)
-                .HasColumnType("timestamp")
-                .HasColumnName("exp_date");
-            entity.Property(e => e.Token)
-                .HasMaxLength(75)
-                .HasDefaultValueSql("''")
-                .HasColumnName("token");
-
-            entity.HasOne(d => d.User).WithOne(p => p.TokenResetPassword)
-                .HasForeignKey<TokenResetPassword>(d => d.UserId)
-                .HasConstraintName("FK_UserPwdToken");
-        });
-
         modelBuilder.Entity<UnitType>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
@@ -689,6 +664,22 @@ public partial class SasipcaContext : DbContext
             entity
                 .HasNoKey()
                 .ToView("v_deliveries_details");
+
+            entity.Property(e => e.BeneficiaryId).HasColumnType("int(11)");
+            entity.Property(e => e.BeneficiaryName).HasMaxLength(50);
+            entity.Property(e => e.DeliveryId).HasColumnType("int(11)");
+            entity.Property(e => e.DeliveryItemId).HasColumnType("int(11)");
+            entity.Property(e => e.ItemCreatedAt)
+                .HasDefaultValueSql("current_timestamp()")
+                .HasColumnType("timestamp");
+            entity.Property(e => e.ItemQuantity).HasColumnType("int(11)");
+            entity.Property(e => e.Note).HasColumnType("text");
+            entity.Property(e => e.ProductBarcode).HasMaxLength(255);
+            entity.Property(e => e.ProductGroupId).HasColumnType("int(11)");
+            entity.Property(e => e.ProductName).HasMaxLength(255);
+            entity.Property(e => e.StatusId).HasColumnType("int(11)");
+            entity.Property(e => e.UserId).HasColumnType("int(11)");
+            entity.Property(e => e.UserName).HasMaxLength(255);
         });
 
         modelBuilder.Entity<VDelivery>(entity =>

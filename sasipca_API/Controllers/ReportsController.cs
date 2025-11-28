@@ -135,7 +135,7 @@ namespace sasipca_API.Controllers
         /// <summary>
         /// Obtém o ficheiro de relatório (PDF ou CSV) previamente gerado e guardado, usando seu ID de registo.
         /// </summary>
-        /// <param name="id">ID do registro do relatório na base de dados.</param>
+        /// <param name="id">ID do registo do relatório na base de dados.</param>
         /// <returns>O ficheiro binário (PDF ou CSV).</returns>
         [HttpGet("{id}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FileContentResult))]

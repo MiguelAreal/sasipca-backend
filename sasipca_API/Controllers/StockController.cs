@@ -77,7 +77,7 @@ namespace sasipca_API.Controllers
                     if (string.IsNullOrEmpty(dto.Name) || dto.CategoryId == null || dto.UnitId == null)
                     {
                         await transaction.RollbackAsync();
-                        return BadRequest(new Resposta($"Produto com Barcode '{barcode}' não existe. É obrigatório fornecer o Nome, CategoryId e UnitId para a criação."));
+                        return BadRequest(new Resposta($"Produto não existe. É obrigatório fornecer o Nome, CategoryId e UnitId para a criação."));
                     }
 
                     // 2. Criar o Produto Mestre
@@ -106,7 +106,7 @@ namespace sasipca_API.Controllers
                         if (!(await _typesService.VerifyUnit(dto.UnitId.Value)))
                         {
                             await transaction.RollbackAsync();
-                            return BadRequest(new Resposta($"Tipo de unidade '{dto.CategoryId.Value}' não encontrada."));
+                            return BadRequest(new Resposta($"Tipo de unidade '{dto.UnitId.Value}' não encontrada."));
                         }
 
 

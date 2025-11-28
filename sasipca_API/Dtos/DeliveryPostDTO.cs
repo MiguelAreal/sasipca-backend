@@ -24,10 +24,10 @@ namespace sasipca_API.Dtos
         public string? Note { get; set; }
 
         /// <summary>
-        /// Lista de produtos/lotes e quantidades a serem entregues.
+        /// Lista de produtos/grupos e quantidades a serem entregues.
         /// </summary>
-        [Required(ErrorMessage = "A lista de Lotes a sair é obrigatória.")]
-        [MinLength(1, ErrorMessage = "A lista de Lotes a sair deve conter pelo menos um item.")]
+        [Required(ErrorMessage = "A lista de Grupos a sair é obrigatória.")]
+        [MinLength(1, ErrorMessage = "A lista de Grupos a sair deve conter pelo menos um item.")]
         public List<DeliveryItemDTO> ItemsToDeliver { get; set; } = new List<DeliveryItemDTO>();
     }
 }

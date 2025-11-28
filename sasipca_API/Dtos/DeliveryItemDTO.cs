@@ -4,7 +4,7 @@ using Xunit.Sdk;
 namespace sasipca_API.Dtos
 {
     /// <summary>
-    /// Item da lista de produtos/lotes a serem entregues.
+    /// Item da lista de produtos/grupos a serem entregues.
     /// </summary>
     public class DeliveryItemDTO
     {
@@ -15,10 +15,10 @@ namespace sasipca_API.Dtos
         public string Barcode { get; set; } = null!;
 
         /// <summary>
-        /// Data de expiração específica do produto.
+        /// ID do grupo específico do produto.
         /// </summary>
-        [Required(ErrorMessage = "Data de Expiração obrigatória.")]
-        public DateOnly ExpiryDate { get; set; }
+        [Required(ErrorMessage = "ID do grupo obrigatório")]
+        public int groupId { get; set; }
 
         /// <summary>
         /// Quantidade a sair do lote.

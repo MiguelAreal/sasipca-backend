@@ -51,10 +51,10 @@ namespace sasipca_API.Services
 
             foreach (var itemDto in itemDtos)
             {
-                // Encontrar o grupo pelo Barcode e data de expiração
+                // Encontrar o grupo pelo groupId
                 var productGroup = await _dbContext.ProductGroups
                     .Include(pl => pl.BarcodeNavigation)
-                    .FirstOrDefaultAsync(pl => pl.Barcode == itemDto.Barcode && pl.ExpiryDate == itemDto.ExpiryDate);
+                    .FirstOrDefaultAsync(pl => pl.Id == itemDto.groupId);
 
                 if (productGroup == null)
                 {

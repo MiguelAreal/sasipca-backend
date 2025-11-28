@@ -127,7 +127,6 @@ namespace sasipca_API.Controllers
 
 
 
-
         // ----------------------------------------------------
         // ENDPOINT 4: CONSULTA DE DETALHES DE UMA ENTREGA
         // ----------------------------------------------------
@@ -136,7 +135,7 @@ namespace sasipca_API.Controllers
         /// </summary>
         /// <param name="deliveryID">ID da entrega.</param>
         /// <returns>Objeto contendo o cabeçalho da entrega e uma lista dos seus itens.</returns>
-        /*[HttpGet("deliveries/{deliveryId}")]
+        [HttpGet("deliveries/{deliveryId}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DeliveryDetailDTO))]
         [ProducesResponseType(StatusCodes.Status401Unauthorized, Type = typeof(Resposta))]
         [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(Resposta))]
@@ -145,7 +144,7 @@ namespace sasipca_API.Controllers
             var details = await _dbContext.VDeliveriesDetails
                  .Where(d => d.DeliveryId == deliveryId)
                  .OrderBy(d => d.ProductBarcode)
-                 .ThenBy(d => d.ProductLotNumber)
+                 .ThenBy(d => d.ProductGroupId)
                  .ToListAsync();
 
             if (!details.Any())
@@ -156,7 +155,7 @@ namespace sasipca_API.Controllers
             var structuredResponse = MapDeliveryDetails(details);
 
             return Ok(structuredResponse);
-        }*/
+        }
 
 
 
@@ -207,7 +206,7 @@ namespace sasipca_API.Controllers
         /// <summary>
         /// Mapeia a lista plana de detalhes da View para um objeto estruturado.
         /// </summary>
-        /*private DeliveryDetailDTO MapDeliveryDetails(List<VDeliveriesDetail> details)
+        private DeliveryDetailDTO MapDeliveryDetails(List<VDeliveriesDetail> details)
         {
             var header = details.First();
 
@@ -231,11 +230,11 @@ namespace sasipca_API.Controllers
                 Items = details.Select(d => new DeliveryItemDTO
                 {
                     Barcode = d.ProductBarcode,
-                    Lot = d.ProductLotNumber,
+                    groupId = d.ProductGroupId,
                     Quantity = d.ItemQuantity
                 }).ToList()
             };
-        }*/
+        }
 
 
 
