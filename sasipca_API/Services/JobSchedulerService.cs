@@ -2,34 +2,95 @@
 using Microsoft.EntityFrameworkCore;
 using sasipca_API.DBModels;
 using sasipca_API.Enumerators;
-using sasipca_API.Models;
 using sasipca_API.Services.Interfaces;
-using System;
-using System.IO;
-using System.Threading.Tasks;
 
 namespace sasipca_API.Services
 {
-    /// <summary>
-    /// Serviço responsável por agendar a atualização de estados.
-    /// </summary>
     public class JobSchedulerService : IJobSchedulerService
     {
-        private readonly SasipcaContext _dbcontext;
-        private readonly INotificationService _notifService;
-        private readonly string _logFilePath = Path.Combine(Directory.GetCurrentDirectory(), "JobSchedulerService_logs.txt");
+        private readonly SasipcaContext _dbContext;
+        private readonly ILogger<JobSchedulerService> _logger;
+        // private readonly INotificationService _notifService; // Injetar se fores enviar notificação
 
-        /// <summary>
-        /// Construtor que inicializa o serviço com o contexto da base de dados.
-        /// </summary>
-        /// <param name="dbcontext">Contexto da base de dados.</param>
-        public JobSchedulerService(SasipcaContext dbcontext, INotificationService notifService)
+        public JobSchedulerService(SasipcaContext dbContext, ILogger<JobSchedulerService> logger)
         {
-            _dbcontext = dbcontext;
-            _notifService = notifService;
+            _dbContext = dbContext;
+            _logger = logger;
         }
 
+        // --------------------------------------------------------
+        // MÉTODO 1: O GATILHO (Chamado na criação da entrega)
+        // --------------------------------------------------------
+        public void ScheduleDeliveryCheck(int deliveryId, DateOnly scheduledDate)
+        {
+            // Lógica: Se a entrega é para dia 20/10, queremos verificar se falhou
+            // no final desse dia (ex: 23:59) ou no início do dia seguinte (ex: 09:00).
 
+            // Vamos agendar para as 23:59 do próprio dia.
+            var checkTime = scheduledDate.ToDateTime(new TimeOnly(23, 59, 0));
 
+            // Se por acaso estamos a criar uma entrega para "hoje" às 23:55, 
+            // damos uma margem de segurança de 10 minutos.
+            if (checkTime < DateTime.Now)
+            {
+                checkTime = DateTime.Now.AddMinutes(10);
+            }
+
+            // AGENDAR NO HANGFIRE
+            // Passamos a 'scheduledDate' como parâmetro para validação futura
+            BackgroundJob.Schedule<IJobSchedulerService>(
+                service => service.VerifyDeliveryStatus(deliveryId, scheduledDate),
+                new DateTimeOffset(checkTime)
+            );
+
+            _logger.LogInformation($"Tarefa agendada para verificar Entrega #{deliveryId} em {checkTime}.");
+        }
+
+        // --------------------------------------------------------
+        // MÉTODO 2: A TAREFA (Executada pelo Hangfire no futuro)
+        // --------------------------------------------------------
+        [AutomaticRetry(Attempts = 3)] // Tenta 3 vezes se falhar por erro de BD
+        public async Task VerifyDeliveryStatus(int deliveryId, DateOnly expectedDate)
+        {
+            _logger.LogInformation($"[Job Hangfire] A verificar Entrega #{deliveryId}...");
+
+            var delivery = await _dbContext.Deliveries
+                .Include(d => d.Beneficiary)
+                .FirstOrDefaultAsync(d => d.Id == deliveryId);
+
+            // 1. A entrega ainda existe?
+            if (delivery == null) return;
+
+            // 2. 
+            // Verificamos se a data da entrega na BD ainda é a data que estávamos à espera.
+            // Se for diferente, significa que o utilizador editou a entrega e este Job é "lixo" antigo.
+            if (delivery.ScheduledDate != expectedDate)
+            {
+                _logger.LogInformation($"[Job Abortado] A data da entrega mudou (Era {expectedDate}, agora é {delivery.ScheduledDate}). Ignorando.");
+                return;
+            }
+
+            // 3. Verificar Estado
+            // Se ainda está "Agendada", então o prazo expirou sem confirmação.
+            if (delivery.StatusId == (int)Enums.DeliveryStatus.Agendada)
+            {
+                // Mudar estado para Cancelada (ou Não Entregue)
+                delivery.StatusId = (int)Enums.DeliveryStatus.Cancelada;
+
+                // Opcional: Adicionar nota automática
+                delivery.Note = (delivery.Note ?? "") + " [Sistema: Expirou automaticamente]";
+
+                _logger.LogWarning($"Entrega #{deliveryId} expirou. Estado alterado para Cancelada.");
+
+                // TODO: Enviar Notificação ao Criador
+                // await _notifService.SendNotification(delivery.UserId, "Entrega Expirada", $"A entrega para {delivery.Beneficiary.Name} não foi confirmada.");
+
+                await _dbContext.SaveChangesAsync();
+            }
+            else
+            {
+                _logger.LogInformation($"Entrega #{deliveryId} já foi tratada (Status: {delivery.StatusId}). Nada a fazer.");
+            }
+        }
     }
 }

@@ -1,5 +1,7 @@
 using DotNetEnv;
+using Serilog;
 using Hangfire;
+using Hangfire.MySql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
@@ -8,13 +10,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using Renci.SshNet;
 using sasipca_API.DBModels;
 using sasipca_API.Hubs;
 using sasipca_API.Middleware;
 using sasipca_API.Models;
 using sasipca_API.Services;
 using sasipca_API.Services.Interfaces;
+using Serilog;
 using System.Globalization;
 using System.Reflection;
 using System.Text;
@@ -22,6 +24,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Unicode;
 using System.Threading.RateLimiting;
+using System.Transactions;
 using WkHtmlToPdfDotNet;
 using WkHtmlToPdfDotNet.Contracts;
 namespace sasipca_API
@@ -34,6 +37,14 @@ namespace sasipca_API
             Console.OutputEncoding = Encoding.UTF8;
             CultureInfo.DefaultThreadCurrentCulture = new CultureInfo("pt-PT");
             CultureInfo.DefaultThreadCurrentUICulture = new CultureInfo("pt-PT");
+
+            Log.Logger = new LoggerConfiguration()
+            .MinimumLevel.Information()
+            .WriteTo.Console() // Continua a mostrar na consola
+            .WriteTo.File("Logs/sasipca-log-.txt", // Cria pasta Logs na raiz
+                rollingInterval: RollingInterval.Day, // Cria um ficheiro novo por dia
+                retainedFileCountLimit: 7) // Guarda apenas os últimos 7 dias
+            .CreateLogger();
 
 
             Env.Load();
@@ -57,11 +68,12 @@ namespace sasipca_API
             }
 
             var builder = WebApplication.CreateBuilder(args);
+            builder.Host.UseSerilog();
 
             //Adicionar dependências de Serviços.
-            builder.Services.AddScoped<INotificationService, NotificationService>();
+            //builder.Services.AddScoped<INotificationService, NotificationService>();
             builder.Services.AddScoped<ImageProcessingService>();
-            builder.Services.AddScoped<JobSchedulerService>();
+            builder.Services.AddScoped<IJobSchedulerService,JobSchedulerService>();
             builder.Services.AddScoped<IAuthService, AuthService>();
             builder.Services.AddScoped<IProductService, ProductService>();
             builder.Services.AddScoped<IBeneficiaryService, BeneficiaryService>();
@@ -72,8 +84,6 @@ namespace sasipca_API
             builder.Services.AddScoped<IJWTService, JWTService>();
             builder.Services.AddTransient<IEmailService, EmailService>();
             builder.Services.AddTransient<ITypesService, TypesService>();
-
-
             builder.Services.AddSingleton<IConverter, SynchronizedConverter>(provider => new SynchronizedConverter(new PdfTools()));
 
             //Adicionar Serviço de WebSocket
@@ -85,17 +95,30 @@ namespace sasipca_API
             builder.Services.AddDbContext<SasipcaContext>(options =>
             options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
 
-
             //Regista o serviço HangFire.
-            /*builder.Services.AddHangfire(config =>
-            config.UseSqlServerStorage(connectionString, new Hangfire.SqlServer.SqlServerStorageOptions
-            {
-                PrepareSchemaIfNecessary = true // Garante que as tabelas sejam criadas na base de dados
-            }));
-
-
-            builder.Services.AddHangfireServer();*/
-            builder.Services.AddSignalR();
+            builder.Services.AddHangfire(configuration => configuration
+            .SetDataCompatibilityLevel(CompatibilityLevel.Version_170)
+            .UseSimpleAssemblyNameTypeSerializer()
+            .UseRecommendedSerializerSettings()
+            .UseStorage(
+                new MySqlStorage(
+                    connectionString,
+                    new MySqlStorageOptions
+                    {
+                        // Configurações recomendadas para evitar Timeouts em tabelas grandes
+                        TransactionIsolationLevel = IsolationLevel.ReadCommitted,
+                        QueuePollInterval = TimeSpan.FromSeconds(15),
+                        JobExpirationCheckInterval = TimeSpan.FromHours(1),
+                        CountersAggregateInterval = TimeSpan.FromMinutes(5),
+                        PrepareSchemaIfNecessary = true, // Cria as tabelas do Hangfire automaticamente
+                        DashboardJobListLimit = 5000,
+                        TransactionTimeout = TimeSpan.FromMinutes(1),
+                        TablesPrefix = "Hangfire_" // Prefixo para não misturar com as outras tabelas
+                    }
+                )
+            ));
+            builder.Services.AddHangfireServer();
+            //builder.Services.AddSignalR();
 
 
             // Regista Serviço de autenticação JWT.
@@ -177,15 +200,14 @@ namespace sasipca_API
                 options.AddPolicy("AllowAll", policy =>
                 {
                     policy.SetIsOriginAllowed(origin =>
-                        origin.StartsWith("http://localhost") || origin.EndsWith(".azurestaticapps.net")|| origin.EndsWith("neighbourlink.pt"))
+                        origin.StartsWith("http://localhost") || origin.EndsWith(".azurestaticapps.net"))
                         .AllowAnyHeader()
                         .AllowAnyMethod()
                         .AllowCredentials();
                 });
             });
 
-            // Implementação de Rate Limiting
-            // Ajuda a prevenir abuso, DDoS e custos excessivos no Azure.
+            // Rate Limiting
             builder.Services.AddRateLimiter(options =>
             {
                 options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
@@ -193,7 +215,7 @@ namespace sasipca_API
                         httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                         key => new FixedWindowRateLimiterOptions
                         {
-                            PermitLimit = 30, // Máximo de 30 requisições...
+                            PermitLimit = 45, // Máximo de 45 requisições...
                             Window = TimeSpan.FromSeconds(60), // ...a cada 60 segundos
                             QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                             QueueLimit = 2 // Se o limite for atingido, mais 2 requisições podem ser enfileiradas
@@ -289,26 +311,22 @@ namespace sasipca_API
                     // Permite que o Swagger envie cookies junto com as requisições
                     c.ConfigObject.AdditionalItems["requestCredentials"] = "inclsude";
                 });
+                app.UseHangfireDashboard();
             }
 
             // Definir a pasta raíz de uploads
             const string StorageRootFolder = "Storage";
 
-            // ===================================================================
             // Verifica e cria a pasta 'Storage' se não existir
-            // ===================================================================
             string storagePath = Path.Combine(app.Environment.ContentRootPath, StorageRootFolder);
 
             if (!Directory.Exists(storagePath))
             {
-                // A lógica para criar o diretorio no sistema de arquivos
+                // A lógica para criar o diretorio no sistema de ficheiros
                 Directory.CreateDirectory(storagePath);
-                // Opcional: Log para saber que a pasta foi criada
-                Console.WriteLine($"Diretório de armazenamento criado em: {storagePath}");
             }
-            // ===================================================================
 
-            // 1. Mapear a pasta "Storage" para a URL "/static"
+            // Mapear a pasta "Storage" para a URL "/static"
             app.UseStaticFiles(new StaticFileOptions
             {
                 // O RequestPath define o prefixo URL que o cliente usará (ex: https://api.exemplo.com/static/CampaignImages/imagem.jpg)
@@ -321,7 +339,7 @@ namespace sasipca_API
             app.UseRouting();
             app.UseCors("AllowAll");
             app.UseWebSockets();
-            app.MapHub<NotificationHub>("/notification-hub");
+            //app.MapHub<NotificationHub>("/notification-hub");
             app.UseAuthentication();
             app.UseAuthorization();
             app.UseRateLimiter();

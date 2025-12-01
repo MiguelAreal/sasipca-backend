@@ -20,10 +20,12 @@ namespace sasipca_API.Services
     public class DeliveryService : IDeliveryService
     {
         private readonly SasipcaContext _dbContext;
+        private readonly IJobSchedulerService _jobScheduler;
 
-        public DeliveryService(SasipcaContext dbContext)
+        public DeliveryService(SasipcaContext dbContext, IJobSchedulerService jobScheduler)
         {
             _dbContext = dbContext;
+            _jobScheduler = jobScheduler;
         }
 
         // ====================================================================
@@ -190,6 +192,12 @@ namespace sasipca_API.Services
                 await _dbContext.SaveChangesAsync();
                 await transaction.CommitAsync();
 
+                if (initialStatus == Enums.DeliveryStatus.Agendada)
+                {
+                    _jobScheduler.ScheduleDeliveryCheck(newDelivery.Id, dto.ScheduledDate);
+                }
+
+
                 var message = initialStatus == Enums.DeliveryStatus.Entregue
                     ? $"Entrega imediata registada e stock deduzido."
                     : $"Entrega agendada com sucesso.";
@@ -295,9 +303,10 @@ namespace sasipca_API.Services
                         return (false, result);
                     }
 
-                    // b) Atualizar Data e Nota
+                    // b) Atualizar Data e Nota e reagendar verificação
                     delivery.ScheduledDate = newScheduledDate;
                     delivery.Note = dto.Note ?? delivery.Note;
+                    _jobScheduler.ScheduleDeliveryCheck(delivery.Id, delivery.ScheduledDate);
                 }
 
 
