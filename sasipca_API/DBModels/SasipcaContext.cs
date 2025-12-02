@@ -25,6 +25,30 @@ public partial class SasipcaContext : DbContext
 
     public virtual DbSet<DeliveryStatus> DeliveryStatuses { get; set; }
 
+    public virtual DbSet<HangfireAggregatedCounter> HangfireAggregatedCounters { get; set; }
+
+    public virtual DbSet<HangfireCounter> HangfireCounters { get; set; }
+
+    public virtual DbSet<HangfireDistributedLock> HangfireDistributedLocks { get; set; }
+
+    public virtual DbSet<HangfireHash> HangfireHashes { get; set; }
+
+    public virtual DbSet<HangfireJob> HangfireJobs { get; set; }
+
+    public virtual DbSet<HangfireJobParameter> HangfireJobParameters { get; set; }
+
+    public virtual DbSet<HangfireJobQueue> HangfireJobQueues { get; set; }
+
+    public virtual DbSet<HangfireJobState> HangfireJobStates { get; set; }
+
+    public virtual DbSet<HangfireList> HangfireLists { get; set; }
+
+    public virtual DbSet<HangfireServer> HangfireServers { get; set; }
+
+    public virtual DbSet<HangfireSet> HangfireSets { get; set; }
+
+    public virtual DbSet<HangfireState> HangfireStates { get; set; }
+
     public virtual DbSet<Movement> Movements { get; set; }
 
     public virtual DbSet<MovementItem> MovementItems { get; set; }
@@ -315,6 +339,215 @@ public partial class SasipcaContext : DbContext
                 .HasColumnName("status");
         });
 
+        modelBuilder.Entity<HangfireAggregatedCounter>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity
+                .ToTable("Hangfire_AggregatedCounter")
+                .HasCharSet("utf8mb3")
+                .UseCollation("utf8mb3_general_ci");
+
+            entity.HasIndex(e => e.Key, "IX_Hangfire_CounterAggregated_Key").IsUnique();
+
+            entity.Property(e => e.Id).HasColumnType("int(11)");
+            entity.Property(e => e.ExpireAt).HasColumnType("datetime");
+            entity.Property(e => e.Key).HasMaxLength(100);
+            entity.Property(e => e.Value).HasColumnType("int(11)");
+        });
+
+        modelBuilder.Entity<HangfireCounter>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity
+                .ToTable("Hangfire_Counter")
+                .HasCharSet("utf8mb3")
+                .UseCollation("utf8mb3_general_ci");
+
+            entity.HasIndex(e => e.Key, "IX_Hangfire_Counter_Key");
+
+            entity.Property(e => e.Id).HasColumnType("int(11)");
+            entity.Property(e => e.ExpireAt).HasColumnType("datetime");
+            entity.Property(e => e.Key).HasMaxLength(100);
+            entity.Property(e => e.Value).HasColumnType("int(11)");
+        });
+
+        modelBuilder.Entity<HangfireDistributedLock>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToTable("Hangfire_DistributedLock")
+                .HasCharSet("utf8mb3")
+                .UseCollation("utf8mb3_general_ci");
+
+            entity.Property(e => e.CreatedAt).HasMaxLength(6);
+            entity.Property(e => e.Resource).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<HangfireHash>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity
+                .ToTable("Hangfire_Hash")
+                .HasCharSet("utf8mb3")
+                .UseCollation("utf8mb3_general_ci");
+
+            entity.HasIndex(e => new { e.Key, e.Field }, "IX_Hangfire_Hash_Key_Field").IsUnique();
+
+            entity.Property(e => e.Id).HasColumnType("int(11)");
+            entity.Property(e => e.ExpireAt).HasMaxLength(6);
+            entity.Property(e => e.Field).HasMaxLength(40);
+            entity.Property(e => e.Key).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<HangfireJob>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity
+                .ToTable("Hangfire_Job")
+                .HasCharSet("utf8mb3")
+                .UseCollation("utf8mb3_general_ci");
+
+            entity.HasIndex(e => e.StateName, "IX_Hangfire_Job_StateName");
+
+            entity.Property(e => e.Id).HasColumnType("int(11)");
+            entity.Property(e => e.CreatedAt).HasMaxLength(6);
+            entity.Property(e => e.ExpireAt).HasMaxLength(6);
+            entity.Property(e => e.StateId).HasColumnType("int(11)");
+            entity.Property(e => e.StateName).HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<HangfireJobParameter>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity
+                .ToTable("Hangfire_JobParameter")
+                .HasCharSet("utf8mb3")
+                .UseCollation("utf8mb3_general_ci");
+
+            entity.HasIndex(e => e.JobId, "FK_Hangfire_JobParameter_Job");
+
+            entity.HasIndex(e => new { e.JobId, e.Name }, "IX_Hangfire_JobParameter_JobId_Name").IsUnique();
+
+            entity.Property(e => e.Id).HasColumnType("int(11)");
+            entity.Property(e => e.JobId).HasColumnType("int(11)");
+            entity.Property(e => e.Name).HasMaxLength(40);
+
+            entity.HasOne(d => d.Job).WithMany(p => p.HangfireJobParameters)
+                .HasForeignKey(d => d.JobId)
+                .HasConstraintName("FK_Hangfire_JobParameter_Job");
+        });
+
+        modelBuilder.Entity<HangfireJobQueue>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity
+                .ToTable("Hangfire_JobQueue")
+                .HasCharSet("utf8mb3")
+                .UseCollation("utf8mb3_general_ci");
+
+            entity.HasIndex(e => new { e.Queue, e.FetchedAt }, "IX_Hangfire_JobQueue_QueueAndFetchedAt");
+
+            entity.Property(e => e.Id).HasColumnType("int(11)");
+            entity.Property(e => e.FetchToken).HasMaxLength(36);
+            entity.Property(e => e.FetchedAt).HasMaxLength(6);
+            entity.Property(e => e.JobId).HasColumnType("int(11)");
+            entity.Property(e => e.Queue).HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<HangfireJobState>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity
+                .ToTable("Hangfire_JobState")
+                .HasCharSet("utf8mb3")
+                .UseCollation("utf8mb3_general_ci");
+
+            entity.HasIndex(e => e.JobId, "FK_Hangfire_JobState_Job");
+
+            entity.Property(e => e.Id).HasColumnType("int(11)");
+            entity.Property(e => e.CreatedAt).HasMaxLength(6);
+            entity.Property(e => e.JobId).HasColumnType("int(11)");
+            entity.Property(e => e.Name).HasMaxLength(20);
+            entity.Property(e => e.Reason).HasMaxLength(100);
+
+            entity.HasOne(d => d.Job).WithMany(p => p.HangfireJobStates)
+                .HasForeignKey(d => d.JobId)
+                .HasConstraintName("FK_Hangfire_JobState_Job");
+        });
+
+        modelBuilder.Entity<HangfireList>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity
+                .ToTable("Hangfire_List")
+                .HasCharSet("utf8mb3")
+                .UseCollation("utf8mb3_general_ci");
+
+            entity.Property(e => e.Id).HasColumnType("int(11)");
+            entity.Property(e => e.ExpireAt).HasMaxLength(6);
+            entity.Property(e => e.Key).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<HangfireServer>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity
+                .ToTable("Hangfire_Server")
+                .HasCharSet("utf8mb3")
+                .UseCollation("utf8mb3_general_ci");
+
+            entity.Property(e => e.Id).HasMaxLength(100);
+            entity.Property(e => e.LastHeartbeat).HasMaxLength(6);
+        });
+
+        modelBuilder.Entity<HangfireSet>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity
+                .ToTable("Hangfire_Set")
+                .HasCharSet("utf8mb3")
+                .UseCollation("utf8mb3_general_ci");
+
+            entity.HasIndex(e => new { e.Key, e.Value }, "IX_Hangfire_Set_Key_Value").IsUnique();
+
+            entity.Property(e => e.Id).HasColumnType("int(11)");
+            entity.Property(e => e.ExpireAt).HasColumnType("datetime");
+            entity.Property(e => e.Key).HasMaxLength(100);
+            entity.Property(e => e.Value).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<HangfireState>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity
+                .ToTable("Hangfire_State")
+                .HasCharSet("utf8mb3")
+                .UseCollation("utf8mb3_general_ci");
+
+            entity.HasIndex(e => e.JobId, "FK_Hangfire_HangFire_State_Job");
+
+            entity.Property(e => e.Id).HasColumnType("int(11)");
+            entity.Property(e => e.CreatedAt).HasMaxLength(6);
+            entity.Property(e => e.JobId).HasColumnType("int(11)");
+            entity.Property(e => e.Name).HasMaxLength(20);
+            entity.Property(e => e.Reason).HasMaxLength(100);
+
+            entity.HasOne(d => d.Job).WithMany(p => p.HangfireStates)
+                .HasForeignKey(d => d.JobId)
+                .HasConstraintName("FK_Hangfire_HangFire_State_Job");
+        });
+
         modelBuilder.Entity<Movement>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
@@ -515,6 +748,10 @@ public partial class SasipcaContext : DbContext
             entity.Property(e => e.CategoryId)
                 .HasColumnType("int(11)")
                 .HasColumnName("category_id");
+            entity.Property(e => e.ExpNotif)
+                .HasComment("Com quantos dias de antecência deve avisar que um grupo do produto vai expirar")
+                .HasColumnType("int(4)")
+                .HasColumnName("exp_notif");
             entity.Property(e => e.Name)
                 .HasMaxLength(255)
                 .HasColumnName("name");

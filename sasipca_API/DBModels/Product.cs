@@ -15,6 +15,11 @@ public partial class Product
 
     public int? UnitSize { get; set; }
 
+    /// <summary>
+    /// Com quantos dias de antecência deve avisar que um grupo do produto vai expirar
+    /// </summary>
+    public int? ExpNotif { get; set; }
+
     public virtual CategoryType Category { get; set; } = null!;
 
     public virtual ICollection<ProductGroup> ProductGroups { get; set; } = new List<ProductGroup>();

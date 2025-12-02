@@ -27,11 +27,14 @@ namespace sasipca_API.Controllers
         private readonly ImageProcessingService _imageProcessingService;
         private readonly IProductService _productService;
         private readonly ITypesService _typesService;
+        private readonly IJobSchedulerService _jobSchedulerService;
 
         /// <summary>
         /// Inicialização do ProdutoController
         /// </summary>
-        public ProductController(SasipcaContext context, INotificationService notifService, IAuthService authService, ImageProcessingService imageProcessingService, IProductService productService, ITypesService typesService)
+        public ProductController(SasipcaContext context, INotificationService notifService, IAuthService authService,
+            ImageProcessingService imageProcessingService, IProductService productService, ITypesService typesService,
+            IJobSchedulerService jobSchedulerService)
         {
             _dbContext = context;
             _notifService = notifService;
@@ -39,6 +42,7 @@ namespace sasipca_API.Controllers
             _imageProcessingService = imageProcessingService;
             _productService = productService;
             _typesService = typesService;
+            _jobSchedulerService = jobSchedulerService;
             
         }
 
@@ -284,10 +288,16 @@ namespace sasipca_API.Controllers
                 }
 
                 // Validação de Quantidade
-                if (dto.UnitSize.HasValue)
+                if (dto.UnitSize.HasValue) product.UnitSize = dto.UnitSize.Value;
+
+                // Validação de dias de aviso prévio
+                if (dto.ExpNotif.HasValue)
                 {
-                    product.UnitSize = dto.UnitSize.Value;
+                    product.ExpNotif = dto.ExpNotif.Value;
+
                 }
+
+
 
                 await _dbContext.SaveChangesAsync();
                 await transaction.CommitAsync();

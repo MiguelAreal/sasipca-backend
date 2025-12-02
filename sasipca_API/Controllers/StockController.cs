@@ -26,6 +26,7 @@ namespace sasipca_API.Controllers
         private readonly IDeliveryService _deliveryService;
         private readonly IAuthService _authService;
         private readonly ITypesService _typesService;
+
         /// <summary>
         /// Inicialização do Stock Controller
         /// Lida com todas as movimentações de stock.
@@ -116,8 +117,8 @@ namespace sasipca_API.Controllers
 
                     _dbContext.Products.Add(product);
                 }
-                // ELSE: Produto existe. Os campos Name, CategoryId, etc. são ignorados.
 
+                // ELSE: Produto existe. Os campos Name, CategoryId, etc. são ignorados.
                 // 3. Criar o cabeçalho da Movimentação
                 var newMovement = new Movement
                 {
@@ -162,7 +163,6 @@ namespace sasipca_API.Controllers
                     {
                         // Grupo existe: Apenas adiciona a quantidade
                         productGroup.Quantity += itemDto.Quantity;
-
                     }
                     else
                     {
