@@ -34,4 +34,20 @@ public class NotificationsController : ControllerBase
         await _service.RegisterDeviceAsync(userId, dto.Token);
         return Ok();
     }
+
+    // DTO para o teste
+    public class TestNotificationDTO
+    {
+        public int TargetUserId { get; set; }
+        public string Title { get; set; }
+        public string Message { get; set; }
+    }
+
+    [HttpPost("send-test")]
+    public async Task<IActionResult> SendTestNotification([FromBody] TestNotificationDTO dto)
+    {
+        // Chama o teu serviço diretamente
+        await _service.SendNotificationAsync(dto.TargetUserId, dto.Title, dto.Message);
+        return Ok("Notificação enviada para a fila.");
+    }
 }

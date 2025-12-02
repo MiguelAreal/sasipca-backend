@@ -71,7 +71,7 @@ namespace sasipca_API
             builder.Host.UseSerilog();
 
             //Adicionar dependências de Serviços.
-            //builder.Services.AddScoped<INotificationService, NotificationService>();
+            builder.Services.AddScoped<INotificationService, NotificationService>();
             builder.Services.AddScoped<ImageProcessingService>();
             builder.Services.AddScoped<IJobSchedulerService,JobSchedulerService>();
             builder.Services.AddScoped<IAuthService, AuthService>();
@@ -118,7 +118,7 @@ namespace sasipca_API
                 )
             ));
             builder.Services.AddHangfireServer();
-            //builder.Services.AddSignalR();
+            builder.Services.AddSignalR();
 
 
             // Regista Serviço de autenticação JWT.
@@ -194,8 +194,8 @@ namespace sasipca_API
                 };
             });
 
-            // Adicionar a política de CORS para Desevolvimento e produção
-            builder.Services.AddCors(options =>
+            // Adicionar a política de CORS para produção
+            /*builder.Services.AddCors(options =>
             {
                 options.AddPolicy("AllowAll", policy =>
                 {
@@ -204,6 +204,18 @@ namespace sasipca_API
                         .AllowAnyHeader()
                         .AllowAnyMethod()
                         .AllowCredentials();
+                });
+            });*/
+
+            //DESENVOLVIMENTO
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("AllowAll", policy =>
+                {
+                    policy.SetIsOriginAllowed(_ => true) // <--- O SEGREDO É ISTO
+                          .AllowAnyHeader()
+                          .AllowAnyMethod()
+                          .AllowCredentials(); // Necessário para SignalR e Auth
                 });
             });
 
@@ -339,7 +351,7 @@ namespace sasipca_API
             app.UseRouting();
             app.UseCors("AllowAll");
             app.UseWebSockets();
-            //app.MapHub<NotificationHub>("/notification-hub");
+            app.MapHub<NotificationHub>("/notification-hub");
             app.UseAuthentication();
             app.UseAuthorization();
             app.UseRateLimiter();
