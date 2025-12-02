@@ -1,16 +1,18 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using FluentAssertions;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using sasipca_API.Attributes;
+using sasipca_API.DBModels;
+using sasipca_API.Dtos;
+using sasipca_API.Enumerators;
+using sasipca_API.Models;
+using sasipca_API.Services;
+using sasipca_API.Services.Interfaces;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using sasipca_API.Models;
-using Microsoft.AspNetCore.Authorization;
-using sasipca_API.Services;
-using sasipca_API.Services.Interfaces;
-using sasipca_API.Enumerators;
-using sasipca_API.Dtos;
-using sasipca_API.DBModels;
-using FluentAssertions;
+using static sasipca_API.Enumerators.Enums;
 
 namespace sasipca_API.Controllers
 {
@@ -19,24 +21,27 @@ namespace sasipca_API.Controllers
     /// </summary>
     [Route("api/stock")]
     [ApiController]
-    [Authorize]
+    [AuthorizeRole(UserRole.Admin)]
     public class StockController : ControllerBase
     {
         private readonly SasipcaContext _dbContext;
         private readonly IDeliveryService _deliveryService;
         private readonly IAuthService _authService;
         private readonly ITypesService _typesService;
+        private readonly IJobSchedulerService _jobSchedulerService;
 
         /// <summary>
         /// Inicialização do Stock Controller
         /// Lida com todas as movimentações de stock.
         /// </summary>
-        public StockController(SasipcaContext context, IDeliveryService deliveryService, IAuthService authService, ITypesService typesService)
+        public StockController(SasipcaContext context, IDeliveryService deliveryService,
+            IAuthService authService, ITypesService typesService, IJobSchedulerService jobSchedulerService)
         {
             _dbContext = context;
             _deliveryService = deliveryService;
             _authService = authService;
             _typesService = typesService;
+            _jobSchedulerService = jobSchedulerService;
         }
 
         // ----------------------------------------------------
@@ -186,6 +191,26 @@ namespace sasipca_API.Controllers
                 }
 
                 await _dbContext.SaveChangesAsync();
+
+                // Só agendamos se o produto tiver a configuração de dias de aviso (ExpNotif) definida.
+                if (product.ExpNotif.HasValue)
+                {
+                    // Iteramos sobre os itens do movimento que acabámos de criar.
+                    // Como já fizemos SaveChanges, o 'item.ProductGroup.Id' já existe.
+                    foreach (var item in newMovement.MovementItems)
+                    {
+                        // O ProductGroup está carregado em memória via Entity Framework
+                        var group = item.ProductGroup;
+
+                        _jobSchedulerService.ScheduleExpiryCheck(
+                            groupId: group.Id,
+                            productName: product.Name,
+                            expiryDate: group.ExpiryDate,
+                            daysBefore: product.ExpNotif.Value
+                        );
+                    }
+                }
+
                 await transaction.CommitAsync();
 
                 var successMessage = isNewProduct

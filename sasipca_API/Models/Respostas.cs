@@ -11,22 +11,17 @@ namespace sasipca_API.Models
     {
         public string AccessToken { get; set; }
         public string RefreshToken { get; set; }
-        public int? UserID { get; set; }
+        public int UserID { get; set; }
         public string UserName { get; set; }
+        public string Role { get; set; }
 
-        /// <summary>
-        /// Inicialização do objeto AuthResponse
-        /// </summary>
-        /// <param name="token">Access Token</param>
-        /// <param name="userId">ID do user</param>
-        /// <param name="userName">Nome do user</param>
-        public AuthResponse(string accesstoken,string refreshtoken,int userId,string userName)
+        public AuthResponse(string accessToken, string refreshToken, int userId, string userName, string role)
         {
-            AccessToken = accesstoken;
-            RefreshToken = refreshtoken;
-            UserName = userName;
+            AccessToken = accessToken;
+            RefreshToken = refreshToken;
             UserID = userId;
-            
+            UserName = userName;
+            Role = role;
         }
     }
 

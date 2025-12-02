@@ -6,12 +6,13 @@ using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 using sasipca_API.DBModels;
 using sasipca_API.Dtos;
+using sasipca_API.Enumerators; // Importante para o Enum
 using sasipca_API.Models;
 using sasipca_API.Services.Interfaces;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Threading.Tasks;
-using static Org.BouncyCastle.Math.EC.ECCurve;
+using System.Security.Cryptography;
+using static sasipca_API.Enumerators.Enums;
 
 namespace sasipca_API.Controllers
 {
@@ -20,16 +21,14 @@ namespace sasipca_API.Controllers
     public class AuthController : ControllerBase
     {
         private readonly SasipcaContext _dbcontext;
-        private readonly IAuthService _authService;
         private readonly IJWTService _jwtService;
         private readonly int _refreshTokenValidityMinutes;
 
-        public AuthController(IAuthService authService, IJWTService jwtService, SasipcaContext context, IConfiguration config)
+        public AuthController(IJWTService jwtService, SasipcaContext context, IConfiguration config)
         {
             _dbcontext = context;
-            _authService = authService;
             _jwtService = jwtService;
-            _refreshTokenValidityMinutes = int.Parse(config["Jwt:RefreshTokenValidityInMinutes"] ?? "7200");
+            _refreshTokenValidityMinutes = int.Parse(config["Jwt:RefreshTokenValidityInMinutes"] ?? "10080"); // 7 dias default
         }
 
         [HttpPost("login/microsoft")]
@@ -39,11 +38,11 @@ namespace sasipca_API.Controllers
             var azureClientId = Environment.GetEnvironmentVariable("AZURE_CLIENT_ID");
 
             if (string.IsNullOrEmpty(loginDto.IdToken))
-                return BadRequest(new Resposta("id_token não fornecido."));
+                return BadRequest(new Resposta("Microsoft id_token não fornecido."));
 
             try
             {
-                // Validação do token Microsoft
+                // 1. Validação do token Microsoft
                 var handler = new JwtSecurityTokenHandler();
                 var configManager = new ConfigurationManager<OpenIdConnectConfiguration>(
                     "https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration",
@@ -64,50 +63,84 @@ namespace sasipca_API.Controllers
 
                 var principal = handler.ValidateToken(loginDto.IdToken, validationParameters, out var validatedToken);
 
-                // Extrair email
+                // 2. Extrair dados do Token
                 var email = principal.FindFirst("preferred_username")?.Value
                             ?? principal.FindFirst("upn")?.Value
                             ?? principal.FindFirst("email")?.Value;
 
                 if (string.IsNullOrEmpty(email) || !email.EndsWith("ipca.pt"))
-                    return Unauthorized(new Resposta("Utilizador não autorizado."));
+                    return Unauthorized(new Resposta("Utilizador não autorizado (domínio inválido)."));
 
-                // Extrair número mecanográfico do e-mail
-                // Ex.: a12345@alunos.ipca.pt -> 12345
+                // Extrair número mecanográfico (a12345 -> 12345)
                 var mecanograficoStr = email.Split('@')[0].TrimStart('a', 'A');
                 if (!int.TryParse(mecanograficoStr, out int mecanografico))
                     return Unauthorized(new Resposta("Número mecanográfico inválido."));
 
-                // Procurar user pelo número mecanográfico (id)
-                var user = await _dbcontext.Users.FindAsync(mecanografico);
-                if (user == null)
-                    return Unauthorized(new Resposta("Utilizador não registado."));
-
-                // Atualizar nome/email se necessário
+                // Dados extra do token
                 var nomeDoToken = principal.FindFirst("name")?.Value
-                                 ?? (principal.FindFirst("given_name")?.Value + " " + principal.FindFirst("family_name")?.Value);
+                                ?? (principal.FindFirst("given_name")?.Value + " " + principal.FindFirst("family_name")?.Value);
 
-                if (!string.IsNullOrEmpty(nomeDoToken) && user.Name != nomeDoToken)
+                // =================================================================================
+                // 3. LÓGICA HÍBRIDA: ADMIN (Users) vs ALUNO (Beneficiaries)
+                // =================================================================================
+
+                UserRole role;
+                int internalId; // O ID da base de dados (PK)
+                string userName;
+                DateTime refreshTokenExp = DateTime.Now.AddMinutes(_refreshTokenValidityMinutes);
+                string refreshToken = GenerateRefreshTokenString();
+
+                // A. Tentar encontrar na tabela USERS (Admins/Staff)
+                // Assumimos que na tabela Users o ID é o número mecanográfico
+                var adminUser = await _dbcontext.Users.FindAsync(mecanografico);
+
+                if (adminUser != null)
                 {
-                    user.Name = nomeDoToken;
-                    user.Email = email; // mantém sincronizado
-                    await _dbcontext.SaveChangesAsync();
+                    role = UserRole.Admin;
+                    internalId = adminUser.Id;
+                    userName = adminUser.Name ?? nomeDoToken ?? "Admin";
+
+                    // Atualizar info se necessário
+                    if (!string.IsNullOrEmpty(nomeDoToken) && adminUser.Name != nomeDoToken) adminUser.Name = nomeDoToken;
+                    adminUser.Email = email;
+
+                    // Guardar Refresh Token
+                    adminUser.RefreshToken = refreshToken;
+                    adminUser.RefreshTokenExp = refreshTokenExp;
+                }
+                else
+                {
+                    // B. Se não é Admin, tentar encontrar na tabela BENEFICIARIES
+                    // Na tabela Beneficiaries, procuramos pelo campo StudentNum
+                    var beneficiary = await _dbcontext.Beneficiaries
+                                            .FirstOrDefaultAsync(b => b.StudentNum == mecanografico);
+
+                    if (beneficiary != null)
+                    {
+                        role = UserRole.Beneficiary;
+                        internalId = beneficiary.Id; // Usamos o PK da tabela (que é auto-increment)
+                        userName = beneficiary.Name;
+
+                        // Guardar Refresh Token
+                        beneficiary.RefreshToken = refreshToken;
+                        beneficiary.RefreshTokenExp = refreshTokenExp;
+                    }
+                    else
+                    {
+                        return Unauthorized(new Resposta("Utilizador não registado no sistema (nem staff, nem aluno)."));
+                    }
                 }
 
-                // Gerar JWT interno + refresh token
-                var accessToken = _jwtService.GenerateToken(user.Id, user.Email);
-                var refreshToken = await _authService.GerarOuManterRefreshToken(user);
+                // 4. Gravar Alterações na BD
+                await _dbcontext.SaveChangesAsync();
 
-                Response.Cookies.Append("refreshToken", refreshToken, new Microsoft.AspNetCore.Http.CookieOptions
-                {
-                    HttpOnly = true,
-                    Secure = true,
-                    SameSite = Microsoft.AspNetCore.Http.SameSiteMode.None,
-                    Expires = user.RefreshTokenExp,
-                    IsEssential = true
-                });
+                // 5. Gerar Tokens
+                var accessToken = _jwtService.GenerateToken(internalId, email, role.ToString());
 
-                return Ok(new AuthResponse(accessToken, refreshToken, user.Id, user.Name));
+                // 6. Setar Cookie
+                SetRefreshTokenCookie(refreshToken, refreshTokenExp);
+
+                return Ok(new AuthResponse(accessToken, refreshToken, internalId, userName, role.ToString()));
             }
             catch (SecurityTokenValidationException stvEx)
             {
@@ -118,7 +151,6 @@ namespace sasipca_API.Controllers
                 return BadRequest(new Resposta($"Erro no login Microsoft: {ex.Message}"));
             }
         }
-
 
         [HttpPost("refresh")]
         [AllowAnonymous]
@@ -135,45 +167,124 @@ namespace sasipca_API.Controllers
             if (principal == null)
                 return Unauthorized(new Resposta("Token de acesso inválido."));
 
+            // Recuperar dados do Token Expirado
             if (!int.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier), out int userId))
                 return Unauthorized(new Resposta("Identificação do utilizador inválida."));
 
-            var user = await _dbcontext.Users.FindAsync(userId);
-            if (user == null || user.RefreshToken != refreshToken || !user.RefreshTokenExp.HasValue)
-                return Unauthorized(new Resposta("Sessão inválida. Efetue login novamente."));
+            var email = principal.FindFirstValue(ClaimTypes.Email);
+            var roleStr = principal.FindFirstValue(ClaimTypes.Role);
 
-            if (user.RefreshTokenExp <= DateTime.Now)
-                return Unauthorized(new Resposta("Sessão expirada. Efetue login novamente."));
+            if (!Enum.TryParse(roleStr, out UserRole role))
+                return Unauthorized(new Resposta("Role inválida."));
 
-            var novoAccessToken = _jwtService.GenerateToken(user.Id, user.Email);
-            var novoRefreshToken = await _authService.AtualizarRefreshTokenSeProximoExpirar(user);
+            // =================================================================================
+            // LÓGICA DE REFRESH POR TIPO DE UTILIZADOR
+            // =================================================================================
 
-            return Ok(new AuthResponse(novoAccessToken, novoRefreshToken, user.Id, user.Name));
+            string newAccessToken;
+            string newRefreshToken = GenerateRefreshTokenString();
+            string userName = "";
+
+            if (role == UserRole.Admin)
+            {
+                var user = await _dbcontext.Users.FindAsync(userId);
+                if (user == null || user.RefreshToken != refreshToken || user.RefreshTokenExp <= DateTime.Now)
+                    return Unauthorized(new Resposta("Sessão inválida ou expirada."));
+
+                userName = user.Name;
+                user.RefreshToken = newRefreshToken;
+                user.RefreshTokenExp = DateTime.Now.AddMinutes(_refreshTokenValidityMinutes);
+            }
+            else if (role == UserRole.Beneficiary)
+            {
+                var beneficiary = await _dbcontext.Beneficiaries.FindAsync(userId);
+                if (beneficiary == null || beneficiary.RefreshToken != refreshToken || beneficiary.RefreshTokenExp <= DateTime.Now)
+                    return Unauthorized(new Resposta("Sessão inválida ou expirada."));
+
+                userName = beneficiary.Name;
+                beneficiary.RefreshToken = newRefreshToken;
+                beneficiary.RefreshTokenExp = DateTime.Now.AddMinutes(_refreshTokenValidityMinutes);
+            }
+            else
+            {
+                return Unauthorized(new Resposta("Tipo de utilizador desconhecido."));
+            }
+
+            await _dbcontext.SaveChangesAsync();
+
+            newAccessToken = _jwtService.GenerateToken(userId, email, role.ToString());
+
+            // Atualizar cookie
+            SetRefreshTokenCookie(newRefreshToken, DateTime.Now.AddMinutes(_refreshTokenValidityMinutes));
+
+            return Ok(new AuthResponse(newAccessToken, newRefreshToken, userId, userName, role.ToString()));
         }
 
         [HttpPost("logout")]
         [Authorize]
         public async Task<IActionResult> Logout()
         {
-            var userId = _authService.GetUserId();
-            if (userId == null)
+            // Ler dados do token atual
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var roleStr = User.FindFirstValue(ClaimTypes.Role);
+
+            if (userIdStr == null || roleStr == null || !int.TryParse(userIdStr, out int userId))
                 return Unauthorized(new Resposta("Utilizador não autenticado."));
 
-            var user = await _dbcontext.Users.FindAsync(userId);
-            if (user == null)
-                return Unauthorized(new Resposta("Utilizador não encontrado."));
+            Enum.TryParse(roleStr, out UserRole role);
 
-            user.RefreshToken = null;
-            user.RefreshTokenExp = null;
+            // Limpar na tabela correta
+            if (role == UserRole.Admin)
+            {
+                var user = await _dbcontext.Users.FindAsync(userId);
+                if (user != null)
+                {
+                    user.RefreshToken = null;
+                    user.RefreshTokenExp = null;
+                }
+            }
+            else if (role == UserRole.Beneficiary)
+            {
+                var beneficiary = await _dbcontext.Beneficiaries.FindAsync(userId);
+                if (beneficiary != null)
+                {
+                    beneficiary.RefreshToken = null;
+                    beneficiary.RefreshTokenExp = null;
+                }
+            }
+
             await _dbcontext.SaveChangesAsync();
 
-            Response.Cookies.Delete("refreshToken", new Microsoft.AspNetCore.Http.CookieOptions
+            Response.Cookies.Delete("refreshToken", new CookieOptions
             {
                 Secure = true,
-                SameSite = Microsoft.AspNetCore.Http.SameSiteMode.None
+                SameSite = SameSiteMode.None
             });
 
             return Ok(new Resposta("Sessão terminada com sucesso."));
+        }
+
+        // --- Helpers ---
+
+        private static string GenerateRefreshTokenString()
+        {
+            var randomNumber = new byte[32];
+            using var rng = RandomNumberGenerator.Create();
+            rng.GetBytes(randomNumber);
+            return Convert.ToBase64String(randomNumber);
+        }
+
+        private void SetRefreshTokenCookie(string refreshToken, DateTime expires)
+        {
+            var cookieOptions = new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.None,
+                Expires = expires,
+                IsEssential = true
+            };
+            Response.Cookies.Append("refreshToken", refreshToken, cookieOptions);
         }
     }
 }

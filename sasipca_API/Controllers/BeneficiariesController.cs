@@ -1,15 +1,18 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using sasipca_API.Attributes;
+using sasipca_API.DBModels;
+using sasipca_API.Dtos;
+using sasipca_API.Enumerators;
 using sasipca_API.Models;
 using sasipca_API.Services;
 using sasipca_API.Services.Interfaces;
-using Microsoft.AspNetCore.Authorization;
-using sasipca_API.Dtos;
-using sasipca_API.DBModels;
-using Humanizer;
+using System.Collections.Generic;
+using System.Linq;
+using System.Security.Claims;
+using System.Threading.Tasks;
+using static sasipca_API.Enumerators.Enums;
 
 namespace sasipca_API.Controllers
 {
@@ -18,43 +21,36 @@ namespace sasipca_API.Controllers
     /// </summary>
     [Route("api/beneficiaries")]
     [ApiController]
-    [Authorize]
     public class BeneficiariesController : ControllerBase
     {
         private readonly SasipcaContext _dbContext;
         private readonly IBeneficiaryService _beneficiaryService;
 
-        /// <summary>
-        /// Inicialização do BeneficiariesController.
-        /// </summary>
-        /// <param name="beneficiaryService">Serviço de beneficiários</param>
-        /// <param name="context">Contexto da base de dados</param>
         public BeneficiariesController(SasipcaContext context, IBeneficiaryService beneficiaryService)
         {
             _dbContext = context;
             _beneficiaryService = beneficiaryService;
         }
 
+        // ----------------------------------------------------
+        // CRIAR PERFIL (POST) - APENAS ADMIN
+        // ----------------------------------------------------
         /// <summary>
         /// Registo de novo perfil de beneficiário.
         /// </summary>
-        /// <remarks>
-        /// Cria um novo perfil de beneficiário após validar:
-        /// - E-mail único
-        /// - Contacto único
-        /// </remarks>
-        /// <param name="beneficiaryPostDto">Dados do novo beneficiário</param>
-        /// <returns>Resultado da operação</returns>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(Resposta))]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(Resposta))]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized, Type = typeof(Resposta))]
+        [ProducesResponseType(StatusCodes.Status403Forbidden, Type = typeof(Resposta))]
         [Produces("application/json")]
         [HttpPost()]
+        [AuthorizeRole(UserRole.Admin)] // <--- BLOQUEIO AQUI
         public async Task<IActionResult> PostBeneficiary([FromBody] BeneficiaryPostDTO beneficiaryPostDto)
         {
             try
             {
-                //Busca id do user a efetuar o registo.
-                int userId = (int)HttpContext.Items["UserId"];
+                // Busca id do user admin a efetuar o registo.
+                int userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
 
                 if (await _dbContext.Users.AnyAsync(p => p.Email == beneficiaryPostDto.Email))
                     return BadRequest(new Resposta("Este e-mail já está registado."));
@@ -62,7 +58,6 @@ namespace sasipca_API.Controllers
                 if (await _dbContext.Users.AnyAsync(p => p.Contact == beneficiaryPostDto.Contact))
                     return BadRequest(new Resposta("Este contacto já está registado."));
 
-                // Use the main context for adding the new user and address
                 var beneficiary = new Beneficiary
                 {
                     Name = beneficiaryPostDto.Name,
@@ -81,7 +76,6 @@ namespace sasipca_API.Controllers
                         PostalCode = beneficiaryPostDto.PostalCode
                     }
                 };
-
 
                 await _dbContext.Beneficiaries.AddAsync(beneficiary);
                 await _dbContext.SaveChangesAsync();
@@ -104,31 +98,41 @@ namespace sasipca_API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new Resposta("Erro ao criar perfil. Tente novamente. " + ex.Message));
+                return BadRequest(new Resposta("Erro ao criar perfil: " + ex.Message));
             }
         }
 
-
+        // ----------------------------------------------------
+        // EDITAR PERFIL (PUT) - ADMIN (TODOS) OU BENEFICIÁRIO (PRÓPRIO)
+        // ----------------------------------------------------
         /// <summary>
         /// Atualizar perfil de beneficiário.
         /// </summary>
-        /// <remarks>
-        /// Atualiza os dados de perfil de beneficiário existente,
-        /// incluindo informações de morada.
-        /// </remarks>
-        /// <param name="beneficiaryId">ID do beneficiário a atualizar</param>
-        /// <param name="beneficiaryPutDto">Novos dados para o beneficiário</param>
-        /// <returns>Resultado da operação</returns>
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(Resposta))]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(Resposta))]
+        [ProducesResponseType(StatusCodes.Status403Forbidden, Type = typeof(Resposta))]
         [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(Resposta))]
         [Produces("application/json")]
         [HttpPut("{beneficiaryId}")]
+        [AuthorizeRole(UserRole.Admin, UserRole.Beneficiary)] // <--- AMBOS PODEM ACEDER
         public async Task<IActionResult> PutBeneficiary(int beneficiaryId, [FromBody] BeneficiaryPostDTO beneficiaryPutDto)
         {
             try
             {
-                int userId = (int)HttpContext.Items["UserId"];
+                // 1. Extrair ID e Role do Token
+                var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                var roleStr = User.FindFirstValue(ClaimTypes.Role);
+
+                if (userIdStr == null || roleStr == null || !int.TryParse(userIdStr, out int userId) || !Enum.TryParse(roleStr, out UserRole userRole))
+                {
+                    return Unauthorized(new Resposta("Utilizador não autenticado."));
+                }
+
+                // 2. SEGURANÇA: Se for Beneficiário e o ID URL != ID Token -> PROIBIDO
+                if (userRole == UserRole.Beneficiary && userId != beneficiaryId)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, new Resposta("Não tem permissão para editar este perfil."));
+                }
 
                 // Buscar beneficiário existente
                 var beneficiary = await _dbContext.Beneficiaries
@@ -139,12 +143,12 @@ namespace sasipca_API.Controllers
                 if (beneficiary == null)
                     return NotFound(new Resposta("Beneficiário não encontrado."));
 
-                // Verificar duplicações de e-mail e contacto (mas ignorar o próprio beneficiário)
+                // Verificar duplicações (ignorando o próprio)
                 if (await _dbContext.Beneficiaries.AnyAsync(p => p.Email == beneficiaryPutDto.Email && p.Id != beneficiaryId))
-                    return BadRequest(new Resposta("Este e-mail já está registado."));
+                    return BadRequest(new Resposta("Este e-mail já está registado noutro perfil."));
 
                 if (await _dbContext.Beneficiaries.AnyAsync(p => p.Contact == beneficiaryPutDto.Contact && p.Id != beneficiaryId))
-                    return BadRequest(new Resposta("Este contacto já está registado."));
+                    return BadRequest(new Resposta("Este contacto já está registado noutro perfil."));
 
                 // Atualizar os campos principais
                 beneficiary.Name = beneficiaryPutDto.Name;
@@ -159,28 +163,26 @@ namespace sasipca_API.Controllers
                 // Atualizar ou criar morada
                 if (!string.IsNullOrWhiteSpace(beneficiaryPutDto.Street) || beneficiaryPutDto.Number.HasValue || !string.IsNullOrWhiteSpace(beneficiaryPutDto.PostalCode))
                 {
-                    // Pelo menos um campo preenchido -> atualizar ou criar
                     if (beneficiary.Address == null)
                     {
                         beneficiary.Address = new BeneficiaryAddress();
                     }
 
                     beneficiary.Address.Street = beneficiaryPutDto.Street ?? "";
-                    beneficiary.Address.Number = beneficiaryPutDto.Number ?? 0; // ou outro valor padrão
+                    beneficiary.Address.Number = beneficiaryPutDto.Number ?? 0;
                     beneficiary.Address.PostalCode = beneficiaryPutDto.PostalCode ?? "";
                 }
                 else
                 {
-                    // Todos vazios -> remover endereço
-                    beneficiary.Address = null;
+                    beneficiary.Address = null; // Se limpar tudo, remove a morada
                 }
 
-
-                // Faz o upsert da observação particular
+                // Upsert da observação particular
+                // NOTA: Se for o próprio aluno a editar, 'userId' é o ID dele.
+                // Ele pode criar uma "nota pessoal" sobre o seu perfil, mas não edita a nota do Admin.
                 if (!string.IsNullOrWhiteSpace(beneficiaryPutDto.ParticularObs))
                 {
-                    var obs = beneficiary.ParticularObs
-                        .FirstOrDefault(o => o.UserId == userId);
+                    var obs = beneficiary.ParticularObs.FirstOrDefault(o => o.UserId == userId);
 
                     if (obs != null)
                     {
@@ -190,7 +192,7 @@ namespace sasipca_API.Controllers
                     {
                         beneficiary.ParticularObs.Add(new ParticularOb
                         {
-                            UserId = userId,
+                            UserId = userId, // Admin ID ou Beneficiary ID
                             BeneficiaryId = beneficiaryId,
                             Obs = beneficiaryPutDto.ParticularObs
                         });
@@ -207,17 +209,14 @@ namespace sasipca_API.Controllers
             }
         }
 
-
+        // ----------------------------------------------------
+        // LISTAR TODOS (GET) - APENAS ADMIN
+        // ----------------------------------------------------
         /// <summary>
         /// Busca todos os beneficiários existentes consoante filtros.
         /// </summary>
-        /// <remarks>
-        /// <param name="pageNumber">Número da página (começa em 1)</param>
-        /// <param name="pageSize">Quantidade de itens por página (máx. 50)</param>
-        /// <param name="orderBy">Ordenação Alfabética ("asc" = Ascendente, "desc" = Descendente</param>
-        /// <param name="searchTerm">Termo para busca por nome</param>
-        /// <returns>Lista paginada de beneficiários</returns>
         [HttpGet()]
+        [AuthorizeRole(UserRole.Admin)] // <--- BLOQUEIO AQUI
         public async Task<ActionResult<PaginatedResponse<BeneficiaryListDTO>>> GetProfiles(
              [FromQuery] int pageNumber = 1,
              [FromQuery] int pageSize = 10,
@@ -226,7 +225,6 @@ namespace sasipca_API.Controllers
         {
             try
             {
-                // Validação dos parâmetros
                 if (pageNumber < 1) pageNumber = 1;
                 if (pageSize < 1 || pageSize > 50) pageSize = 10;
                 if (orderBy != "asc" && orderBy != "desc")
@@ -240,17 +238,15 @@ namespace sasipca_API.Controllers
 
                 if (!beneficiaries.Any())
                 {
-                    return NotFound(new Resposta("Nenhum beneficiário encontrado com os filtros e termo de pesquisa."));
+                    return NotFound(new Resposta("Nenhum beneficiário encontrado."));
                 }
 
-                // Aplica paginação
                 var totalCount = beneficiaries.Count;
                 var pagedBeneficiaries = beneficiaries
                     .Skip((pageNumber - 1) * pageSize)
                     .Take(pageSize)
                     .ToList();
 
-                // Cria resposta paginada
                 var paginatedResponse = new PaginatedResponse<BeneficiaryListDTO>
                 {
                     Data = pagedBeneficiaries,
@@ -259,11 +255,6 @@ namespace sasipca_API.Controllers
                     TotalCount = totalCount,
                     TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
                 };
-
-                if (!paginatedResponse.Data.Any())
-                {
-                    return NotFound(new Resposta("Página solicitada está vazia."));
-                }
 
                 return Ok(paginatedResponse);
             }
@@ -274,22 +265,31 @@ namespace sasipca_API.Controllers
             }
         }
 
-
-        /// <summary>
-        /// Busca um beneficiário específico, incluindo morada e observações particulares do utilizador autenticado.
-        /// </summary>
-        /// <param name="beneficiaryId">ID do beneficiário a consultar</param>
-        /// <returns>Detalhes de um beneficiário</returns>
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(BeneficiaryGetDTO))]
-        [ProducesResponseType(StatusCodes.Status401Unauthorized, Type = typeof(Resposta))]
-        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(Resposta))]
-        [Produces("application/json")]
+        // ----------------------------------------------------
+        // OBTER PERFIL ÚNICO (GET) - JÁ CONFIGURADO ANTES
+        // ----------------------------------------------------
         [HttpGet("{beneficiaryId}")]
+        [AuthorizeRole(UserRole.Admin, UserRole.Beneficiary)]
         public async Task<ActionResult> GetProfile(int beneficiaryId)
         {
+            // ... (Manter o código da resposta anterior que valida se userId == beneficiaryId) ...
+            // Vou replicar aqui para ficar completo o ficheiro:
+
             try
             {
-                int userId = (int)HttpContext.Items["UserId"];
+                var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                var roleStr = User.FindFirstValue(ClaimTypes.Role);
+
+                if (userIdStr == null || roleStr == null || !int.TryParse(userIdStr, out int userId) || !Enum.TryParse(roleStr, out UserRole userRole))
+                {
+                    return Unauthorized(new Resposta("Utilizador não autenticado."));
+                }
+
+                // SEGURANÇA: Beneficiário só vê o seu
+                if (userRole == UserRole.Beneficiary && userId != beneficiaryId)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, new Resposta("Não tem permissão para visualizar este perfil."));
+                }
 
                 var beneficiary = await _dbContext.Beneficiaries
                     .Where(b => b.Id == beneficiaryId)
@@ -306,13 +306,11 @@ namespace sasipca_API.Controllers
                         StudentNum = b.StudentNum,
                         Nif = b.Nif,
                         GlobalObs = b.GlobalObs,
-
-                        // Apenas a observação particular do utilizador autenticado
+                        // Filtra para ver apenas a observação criada por QUEM está a ver (Admin ou o próprio)
                         ParticularObs = b.ParticularObs
                             .Where(po => po.UserId == userId)
                             .Select(po => po.Obs)
                             .FirstOrDefault(),
-
                         Street = b.Address != null ? b.Address.Street : null,
                         Number = b.Address != null ? b.Address.Number : null,
                         PostalCode = b.Address != null ? b.Address.PostalCode : null
@@ -329,6 +327,5 @@ namespace sasipca_API.Controllers
                 return BadRequest(new Resposta($"Ocorreu um erro ao obter o perfil: {ex.Message}"));
             }
         }
-
     }
 }

@@ -31,6 +31,10 @@ public partial class Beneficiary
 
     public int CreatedBy { get; set; }
 
+    public string? RefreshToken { get; set; }
+
+    public DateTime? RefreshTokenExp { get; set; }
+
     public virtual BeneficiaryAddress? Address { get; set; }
 
     public virtual User CreatedByNavigation { get; set; } = null!;

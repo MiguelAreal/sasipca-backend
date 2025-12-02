@@ -1,9 +1,13 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using sasipca_API.Attributes;
 using sasipca_API.DBModels;
 using sasipca_API.Dtos;
+using sasipca_API.Enumerators; // Importante para o Enum UserRole
 using sasipca_API.Models;
+using System.Security.Claims;
+using static sasipca_API.Enumerators.Enums; // Necessário para ler claims
 
 namespace sasipca_API.Controllers
 {
@@ -12,7 +16,8 @@ namespace sasipca_API.Controllers
     /// </summary>
     [Route("api")]
     [ApiController]
-    [Authorize]
+    // Permite que tanto Admins como Beneficiários acedam ao controller
+    [AuthorizeRole(UserRole.Admin, UserRole.Beneficiary)]
     public class HistoryController : ControllerBase
     {
         private readonly SasipcaContext _dbContext;
@@ -30,10 +35,11 @@ namespace sasipca_API.Controllers
         /// </summary>
         /// <returns>Lista de movimentos resumidos.</returns>
         [HttpGet("movements")]
+        [AuthorizeRole(UserRole.Admin)] // Apenas Admins devem ver movimentos de stock internos
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<VMovHistory>))]
         [ProducesResponseType(StatusCodes.Status401Unauthorized, Type = typeof(Resposta))]
         public async Task<ActionResult<IEnumerable<VMovHistory>>> GetMovementHistory()
-        {            
+        {
             var history = await _dbContext.VMovHistories
                 .OrderByDescending(h => h.MovementDate)
                 .ThenByDescending(h => h.MovementId)
@@ -56,35 +62,35 @@ namespace sasipca_API.Controllers
         /// <param name="movementId">ID da movimentação.</param>
         /// <returns>Objeto contendo o cabeçalho do movimento e uma lista dos seus itens.</returns>
         [HttpGet("movements/{movementId}")]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(MovementDetailDTO))] // Usaremos um DTO de resposta aninhado
+        [AuthorizeRole(UserRole.Admin)] // Apenas Admins
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(MovementDetailDTO))]
         [ProducesResponseType(StatusCodes.Status401Unauthorized, Type = typeof(Resposta))]
         [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(Resposta))]
         public async Task<ActionResult> GetMovementDetails(int movementId)
         {
-           var details = await _dbContext.VMovHistoryDetails
-                .Where(d => d.MovementId == movementId)
-                .OrderBy(d => d.ProductBarcode) // Ordena os itens para consistência
-                .ThenBy(d => d.ProductGroupId)
-                .ToListAsync();
+            var details = await _dbContext.VMovHistoryDetails
+                 .Where(d => d.MovementId == movementId)
+                 .OrderBy(d => d.ProductBarcode)
+                 .ThenBy(d => d.ProductGroupId)
+                 .ToListAsync();
 
             if (!details.Any())
             {
                 return NotFound(new Resposta($"Movimento não encontrado."));
             }
 
-            // Mapeamento para um DTO de resposta estruturado (melhora a legibilidade da API)
             var structuredResponse = MapMovDetails(details);
 
             return Ok(structuredResponse);
         }
 
-
-
         // ----------------------------------------------------
         // ENDPOINT 3: CONSULTA DE ENTREGAS (COM FILTROS)
         // ----------------------------------------------------
         /// <summary>
-        /// Retorna a lista de todas as entregas (cabeçalhos), com opções de filtragem por status, beneficiário e data.
+        /// Retorna a lista de todas as entregas (cabeçalhos).
+        /// Se Admin: Pode ver tudo e filtrar por qualquer beneficiário.
+        /// Se Beneficiário: Vê apenas as suas próprias entregas.
         /// </summary>
         /// <param name="query">Parâmetros de filtro (StatusId, BeneficiaryId, DateFrom, DateTo).</param>
         /// <returns>Lista de cabeçalhos de entregas.</returns>
@@ -92,19 +98,36 @@ namespace sasipca_API.Controllers
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<VDelivery>))]
         public async Task<ActionResult<IEnumerable<VDelivery>>> GetDeliveries([FromQuery] DeliveryGetDTO query)
         {
-            // Usamos a View pré-agregada que já contém todos os nomes e o status em formato string.
-            var deliveriesQuery = _dbContext.VDeliveries.AsQueryable();
+            // 1. Identificar o Utilizador e o seu Role
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var roleStr = User.FindFirstValue(ClaimTypes.Role);
 
-            // 1. Aplicação dos Filtros
-
-            if (query.StatusId.HasValue)
+            if (userIdStr == null || roleStr == null || !int.TryParse(userIdStr, out int userId) || !Enum.TryParse(roleStr, out UserRole userRole))
             {
-                deliveriesQuery = deliveriesQuery.Where(d => d.StatusId == (int)query.StatusId.Value); 
+                return Unauthorized(new Resposta("Utilizador não autenticado ou token inválido."));
             }
 
-            if (query.BeneficiaryId.HasValue)
+            var deliveriesQuery = _dbContext.VDeliveries.AsQueryable();
+
+            // 2. Aplicar Restrições de Segurança baseadas no Role
+            if (userRole == UserRole.Beneficiary)
             {
-                deliveriesQuery = deliveriesQuery.Where(d => d.BeneficiaryId == query.BeneficiaryId.Value);
+                // Beneficiário só vê as suas entregas
+                deliveriesQuery = deliveriesQuery.Where(d => d.BeneficiaryId == userId);
+            }
+            else if (userRole == UserRole.Admin)
+            {
+                // Admin pode filtrar por beneficiário se quiser
+                if (query.BeneficiaryId.HasValue)
+                {
+                    deliveriesQuery = deliveriesQuery.Where(d => d.BeneficiaryId == query.BeneficiaryId.Value);
+                }
+            }
+
+            // 3. Aplicação dos Filtros Comuns (Status e Datas)
+            if (query.StatusId.HasValue)
+            {
+                deliveriesQuery = deliveriesQuery.Where(d => d.StatusId == (int)query.StatusId.Value);
             }
 
             if (query.DateFrom.HasValue)
@@ -117,7 +140,7 @@ namespace sasipca_API.Controllers
                 deliveriesQuery = deliveriesQuery.Where(d => d.ScheduledDate <= DateOnly.FromDateTime(query.DateTo.Value));
             }
 
-            // 2. Execução da Query
+            // 4. Execução da Query
             var result = await deliveriesQuery
                 .OrderByDescending(d => d.ScheduledDate)
                 .ToListAsync();
@@ -125,22 +148,32 @@ namespace sasipca_API.Controllers
             return Ok(result);
         }
 
-
-
         // ----------------------------------------------------
         // ENDPOINT 4: CONSULTA DE DETALHES DE UMA ENTREGA
         // ----------------------------------------------------
         /// <summary>
         /// Busca todos os detalhes de uma entrega específica.
+        /// Valida se o beneficiário tem permissão para ver esta entrega.
         /// </summary>
-        /// <param name="deliveryID">ID da entrega.</param>
+        /// <param name="deliveryId">ID da entrega.</param>
         /// <returns>Objeto contendo o cabeçalho da entrega e uma lista dos seus itens.</returns>
         [HttpGet("deliveries/{deliveryId}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DeliveryDetailDTO))]
         [ProducesResponseType(StatusCodes.Status401Unauthorized, Type = typeof(Resposta))]
+        [ProducesResponseType(StatusCodes.Status403Forbidden, Type = typeof(Resposta))] // Novo: Proibido
         [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(Resposta))]
         public async Task<ActionResult> GetDeliveryDetails(int deliveryId)
         {
+            // 1. Identificar o Utilizador
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var roleStr = User.FindFirstValue(ClaimTypes.Role);
+
+            if (userIdStr == null || roleStr == null || !int.TryParse(userIdStr, out int userId) || !Enum.TryParse(roleStr, out UserRole userRole))
+            {
+                return Unauthorized(new Resposta("Utilizador não autenticado."));
+            }
+
+            // 2. Buscar detalhes
             var details = await _dbContext.VDeliveriesDetails
                  .Where(d => d.DeliveryId == deliveryId)
                  .OrderBy(d => d.ProductBarcode)
@@ -152,15 +185,19 @@ namespace sasipca_API.Controllers
                 return NotFound(new Resposta($"Entrega com ID {deliveryId} não encontrada."));
             }
 
+            // 3. Validação de Segurança: Verificar se a entrega pertence ao beneficiário
+            // O campo BeneficiaryId deve existir na view VDeliveriesDetails
+            var deliveryOwnerId = details.First().BeneficiaryId;
+
+            if (userRole == UserRole.Beneficiary && deliveryOwnerId != userId)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new Resposta("Não tem permissão para visualizar esta entrega."));
+            }
+
             var structuredResponse = MapDeliveryDetails(details);
 
             return Ok(structuredResponse);
         }
-
-
-
-
-
 
 
         // ----------------------------------------------------

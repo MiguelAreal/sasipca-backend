@@ -3,6 +3,16 @@
     public class Enums
     {
         /// <summary>
+        /// Tipo de utilizador (apenas interno à API)
+        /// </summary>
+        public enum UserRole
+        {
+            Admin = 1,
+            Beneficiary = 2
+        }
+
+
+        /// <summary>
         /// Tipos de unidades de produtos.
         /// </summary>
         public enum UnitTypes

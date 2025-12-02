@@ -1,16 +1,18 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using sasipca_API.Attributes;
 using sasipca_API.DBModels;
 using sasipca_API.Dtos;
 using sasipca_API.Models;
 using sasipca_API.Services.Interfaces;
+using static sasipca_API.Enumerators.Enums;
 
 namespace sasipca_API.Controllers
 {
     [Route("api/campaigns")]
     [ApiController]
-    [Authorize]
+    [AuthorizeRole(UserRole.Admin)]
     public class CampaignsController : ControllerBase
     {
         private readonly SasipcaContext _dbContext;

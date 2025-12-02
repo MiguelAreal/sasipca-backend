@@ -10,12 +10,16 @@ namespace sasipca_API.Services
     {
         private readonly SasipcaContext _dbContext;
         private readonly ILogger<JobSchedulerService> _logger;
-        // private readonly INotificationService _notifService; // Injetar se fores enviar notificação
+        private readonly INotificationService _notifService; // INJETADO AGORA
 
-        public JobSchedulerService(SasipcaContext dbContext, ILogger<JobSchedulerService> logger)
+        public JobSchedulerService(
+            SasipcaContext dbContext,
+            ILogger<JobSchedulerService> logger,
+            INotificationService notifService) // RECEBIDO NO CONSTRUTOR
         {
             _dbContext = dbContext;
             _logger = logger;
+            _notifService = notifService;
         }
 
         // --------------------------------------------------------
@@ -23,21 +27,14 @@ namespace sasipca_API.Services
         // --------------------------------------------------------
         public void ScheduleDeliveryCheck(int deliveryId, DateOnly scheduledDate)
         {
-            // Lógica: Se a entrega é para dia 20/10, queremos verificar se falhou
-            // no final desse dia (ex: 23:59) ou no início do dia seguinte (ex: 09:00).
-
-            // Vamos agendar para as 23:59 do próprio dia.
+            // ... (Lógica de cálculo de tempo mantém-se igual) ...
             var checkTime = scheduledDate.ToDateTime(new TimeOnly(23, 59, 0));
 
-            // Se por acaso estamos a criar uma entrega para "hoje" às 23:55, 
-            // damos uma margem de segurança de 10 minutos.
             if (checkTime < DateTime.Now)
             {
                 checkTime = DateTime.Now.AddMinutes(10);
             }
 
-            // AGENDAR NO HANGFIRE
-            // Passamos a 'scheduledDate' como parâmetro para validação futura
             BackgroundJob.Schedule<IJobSchedulerService>(
                 service => service.VerifyDeliveryStatus(deliveryId, scheduledDate),
                 new DateTimeOffset(checkTime)
@@ -49,47 +46,45 @@ namespace sasipca_API.Services
         // --------------------------------------------------------
         // MÉTODO 2: TAREFA (Executada pelo Hangfire no futuro)
         // --------------------------------------------------------
-        [AutomaticRetry(Attempts = 3)] // Tenta 3 vezes se falhar por erro de BD
+        [AutomaticRetry(Attempts = 3)]
         public async Task VerifyDeliveryStatus(int deliveryId, DateOnly expectedDate)
         {
             _logger.LogInformation($"[Job Hangfire] A verificar Entrega #{deliveryId}...");
 
             var delivery = await _dbContext.Deliveries
                 .Include(d => d.Beneficiary)
+                .Include(d => d.User) // Incluir o User (criador) para sabermos a quem notificar
                 .FirstOrDefaultAsync(d => d.Id == deliveryId);
 
-            // 1. A entrega ainda existe?
             if (delivery == null) return;
 
-            // 2. 
-            // Verificamos se a data da entrega na BD ainda é a data que estávamos à espera.
-            // Se for diferente, significa que o utilizador editou a entrega e este Job é "lixo" antigo.
             if (delivery.ScheduledDate != expectedDate)
             {
-                _logger.LogInformation($"[Job Abortado] A data da entrega mudou (Era {expectedDate}, agora é {delivery.ScheduledDate}). Ignorando.");
+                _logger.LogInformation($"[Job Abortado] A data da entrega mudou. Ignorando.");
                 return;
             }
 
-            // 3. Verificar Estado
-            // Se ainda está "Agendada", então o prazo expirou sem confirmação.
             if (delivery.StatusId == (int)Enums.DeliveryStatus.Agendada)
             {
-                // Mudar estado para Cancelada (ou Não Entregue)
+                // Mudar estado para Cancelada
                 delivery.StatusId = (int)Enums.DeliveryStatus.Cancelada;
-
-                // Opcional: Adicionar nota automática
                 delivery.Note = (delivery.Note ?? "") + " [Sistema: Expirou automaticamente]";
 
                 _logger.LogWarning($"Entrega #{deliveryId} expirou. Estado alterado para Cancelada.");
 
-                // TODO: Enviar Notificação ao Criador
-                // await _notifService.SendNotification(delivery.UserId, "Entrega Expirada", $"A entrega para {delivery.Beneficiary.Name} não foi confirmada.");
+                // --- ENVIO DE NOTIFICAÇÃO ---
+                // Notificar o criador da entrega
+                await _notifService.SendNotificationAsync(
+                    userId: delivery.UserId,
+                    title: "Entrega Expirada",
+                    message: $"A entrega para {delivery.Beneficiary.Name} agendada para {expectedDate} expirou e foi cancelada."
+                );
 
                 await _dbContext.SaveChangesAsync();
             }
             else
             {
-                _logger.LogInformation($"Entrega #{deliveryId} já foi tratada (Status: {delivery.StatusId}). Nada a fazer.");
+                _logger.LogInformation($"Entrega #{deliveryId} já foi tratada. Nada a fazer.");
             }
         }
 
@@ -102,65 +97,54 @@ namespace sasipca_API.Services
         {
             if (daysBefore <= 0) return;
 
-            // Calcular a data do aviso: Validade - Dias de Aviso
-            var notificationDate = expiryDate.AddDays(-daysBefore).ToDateTime(new TimeOnly(8, 30, 0)); // Avisar às 08:30 da manhã
+            var notificationDate = expiryDate.AddDays(-daysBefore).ToDateTime(new TimeOnly(8, 30, 0));
 
-            // Se a data de aviso já passou (ex: definimos aviso de 5 dias para algo que vence amanhã),
-            // agendamos para "daqui a 10 minutos" para o utilizador ser avisado asap.
             if (notificationDate < DateTime.Now)
             {
                 notificationDate = DateTime.Now.AddMinutes(10);
             }
 
-            // Agendar no Hangfire
             BackgroundJob.Schedule<IJobSchedulerService>(
                 service => service.VerifyProductExpiry(groupId, daysBefore),
                 new DateTimeOffset(notificationDate)
             );
 
-            _logger.LogInformation($"Agendado aviso de validade para Lote #{groupId} ({productName}) em {notificationDate} (Validade: {expiryDate}).");
+            _logger.LogInformation($"Agendado aviso de validade para grupo #{groupId} ({productName}) em {notificationDate}.");
         }
-
-
 
         [AutomaticRetry(Attempts = 3)]
         public async Task VerifyProductExpiry(int groupId, int expectedDaysBefore)
         {
-            // 1. Buscar o Grupo
             var group = await _dbContext.ProductGroups
-                .Include(g => g.BarcodeNavigation) // Incluir dados do Produto Pai
+                .Include(g => g.BarcodeNavigation)
                 .FirstOrDefaultAsync(g => g.Id == groupId);
 
             if (group == null) return;
 
-            // 2. VALIDAÇÃO INTELIGENTE (Runtime Validation)
-
-            // A. O produto ainda tem stock? Se já foi tudo vendido/consumido, não chatear.
+            // Validações de Runtime
             if (group.Quantity <= 0)
             {
                 _logger.LogInformation($"[Job Expiry Ignorado] Grupo #{groupId} já não tem stock.");
                 return;
             }
 
-            // B. A configuração de dias mudou?
-            // Se o produto agora diz "Avisar 10 dias antes" e este Job era para "5 dias antes",
-            // significa que este Job é antigo e deve ser ignorado (o novo Job tratará do aviso).
             if (group.BarcodeNavigation.ExpNotif != expectedDaysBefore)
             {
-                _logger.LogInformation($"[Job Expiry Ignorado] Configuração de dias mudou (Era {expectedDaysBefore}, agora é {group.BarcodeNavigation.ExpNotif}).");
+                _logger.LogInformation($"[Job Expiry Ignorado] Configuração de dias mudou.");
                 return;
             }
 
-            // 3. Enviar Notificação
+            // --- ENVIO DE NOTIFICAÇÃO ---
             var daysRemaining = group.ExpiryDate.DayNumber - DateOnly.FromDateTime(DateTime.Now).DayNumber;
 
-            _logger.LogWarning($"[ALERTA VALIDADE] O produto {group.BarcodeNavigation.Name} (Lote {groupId}) expira em {daysRemaining} dias!");
+            _logger.LogWarning($"[ALERTA VALIDADE] O produto {group.BarcodeNavigation.Name} expira em {daysRemaining} dias!");
 
-            // Enviar para todos os utilizadores ou admins
-            // await _notifService.BroadcastNotification(
-            //    title: "Aviso de Validade", 
-            //    message: $"O produto '{group.BarcodeNavigation.Name}' tem {group.Quantity} unidades que expiram a {group.ExpiryDate}."
-            // );
+            // Enviar para todos os utilizadores (Broadcast)
+            // Isto garante que todos os voluntários/staff recebem o alerta de validade
+            await _notifService.BroadcastNotification(
+                title: "Aviso de Validade",
+                message: $"O produto '{group.BarcodeNavigation.Name}' tem {group.Quantity} unidades que expiram a {group.ExpiryDate} ({daysRemaining} dias)."
+            );
         }
     }
 }

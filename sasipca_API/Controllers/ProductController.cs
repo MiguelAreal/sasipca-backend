@@ -1,15 +1,17 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using sasipca_API.Attributes;
+using sasipca_API.DBModels;
+using sasipca_API.Dtos;
+using sasipca_API.Enumerators;
+using sasipca_API.Models;
+using sasipca_API.Services;
+using sasipca_API.Services.Interfaces;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using sasipca_API.Models;
-using Microsoft.AspNetCore.Authorization;
-using sasipca_API.Services;
-using sasipca_API.Services.Interfaces;
-using sasipca_API.Enumerators;
-using sasipca_API.Dtos;
-using sasipca_API.DBModels;
+using static sasipca_API.Enumerators.Enums;
 
 namespace sasipca_API.Controllers
 {
@@ -18,7 +20,6 @@ namespace sasipca_API.Controllers
     /// </summary>
     [Route("api/products")]
     [ApiController]
-    [Authorize]
     public class ProductController : ControllerBase
     {
         private readonly SasipcaContext _dbContext;
@@ -58,6 +59,7 @@ namespace sasipca_API.Controllers
         /// <param name="searchTerm">Termo para busca por nome</param>
         /// <returns>Lista paginada de produtos</returns>
         [HttpGet()]
+        [AuthorizeRole(UserRole.Admin,UserRole.Beneficiary)]
         public async Task<ActionResult<PaginatedResponse<ProductListDTO>>> GetAllProducts(
          [FromQuery] int pageNumber = 1,
          [FromQuery] int pageSize = 10,
@@ -137,6 +139,7 @@ namespace sasipca_API.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(Resposta))]
         [Produces("application/json")]
         [HttpGet("{barcode}")]
+        [AuthorizeRole(UserRole.Admin,UserRole.Beneficiary)]
         public async Task<ActionResult<ProductGetDTO>> GetProduct(string barcode)
         {
             try
@@ -242,11 +245,13 @@ namespace sasipca_API.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(Resposta))]
         [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(Resposta))]
         [HttpPut("{barcode}")]
+        [AuthorizeRole(UserRole.Admin)]
         public async Task<ActionResult> PutProduct(string barcode, [FromBody] ProductPutDTO dto)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            var product = await _dbContext.Products.FindAsync(barcode);
+            var product = await _dbContext.Products.Include(p => p.ProductGroups).FirstOrDefaultAsync(p => p.Barcode == barcode);
+
             if (product == null) return NotFound(new Resposta($"Produto {barcode} não encontrado."));
 
 
@@ -291,15 +296,43 @@ namespace sasipca_API.Controllers
                 if (dto.UnitSize.HasValue) product.UnitSize = dto.UnitSize.Value;
 
                 // Validação de dias de aviso prévio
+                bool expNotifChanged = false;
+
                 if (dto.ExpNotif.HasValue)
                 {
-                    product.ExpNotif = dto.ExpNotif.Value;
-
+                    // Verifica se o valor mudou para evitar processamento desnecessário
+                    if (product.ExpNotif != dto.ExpNotif.Value)
+                    {
+                        product.ExpNotif = dto.ExpNotif.Value;
+                        expNotifChanged = true;
+                    }
                 }
 
 
 
                 await _dbContext.SaveChangesAsync();
+
+                // Se a configuração de dias mudou, temos de reagendar para todos os grupos existentes
+                if (expNotifChanged && product.ExpNotif.HasValue)
+                {
+                    // Filtrar apenas grupos com stock e data futura
+                    var activeGroups = product.ProductGroups
+                        .Where(g => g.Quantity > 0 && g.ExpiryDate >= DateOnly.FromDateTime(DateTime.Now))
+                        .ToList();
+
+                    foreach (var group in activeGroups)
+                    {
+                        // Agendar tarefa para este grupo
+                        _jobSchedulerService.ScheduleExpiryCheck(
+                            groupId: group.Id,
+                            productName: product.Name,
+                            expiryDate: group.ExpiryDate,
+                            daysBefore: product.ExpNotif.Value
+                        );
+                    }
+                }
+
+
                 await transaction.CommitAsync();
 
                 return Ok(new Resposta("Produto atualizado com sucesso."));

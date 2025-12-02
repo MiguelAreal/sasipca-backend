@@ -1,14 +1,15 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using sasipca_API.Attributes;
 using sasipca_API.Dtos;
 using sasipca_API.Models;
 using sasipca_API.Services.Interfaces;
 using System;
+using System.IO; // Necessário para Path
+using System.Security.Claims; // Necessário para claims
 using System.Threading.Tasks;
 using static sasipca_API.Dtos.ReportRequestDTO;
 using static sasipca_API.Enumerators.Enums;
-using System.Security.Claims; // Necessário para claims
-using System.IO; // Necessário para Path
 
 namespace sasipca_API.Controllers
 {
@@ -19,7 +20,7 @@ namespace sasipca_API.Controllers
     /// </summary>
     [Route("api/reports")]
     [ApiController]
-    [Authorize]
+    [AuthorizeRole(UserRole.Admin)]
     public class ReportsController : ControllerBase
     {
         private readonly IReportingService _reportingService;

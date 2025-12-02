@@ -73,6 +73,8 @@ public partial class SasipcaContext : DbContext
 
     public virtual DbSet<User> Users { get; set; }
 
+    public virtual DbSet<UserDevice> UserDevices { get; set; }
+
     public virtual DbSet<VDeliveriesDetail> VDeliveriesDetails { get; set; }
 
     public virtual DbSet<VDelivery> VDeliveries { get; set; }
@@ -137,6 +139,12 @@ public partial class SasipcaContext : DbContext
             entity.Property(e => e.Nif)
                 .HasColumnType("int(9)")
                 .HasColumnName("nif");
+            entity.Property(e => e.RefreshToken)
+                .HasMaxLength(255)
+                .HasColumnName("refresh_token");
+            entity.Property(e => e.RefreshTokenExp)
+                .HasColumnType("datetime")
+                .HasColumnName("refresh_token_exp");
             entity.Property(e => e.StudentNum)
                 .HasColumnType("int(10)")
                 .HasColumnName("student_num");
@@ -894,6 +902,35 @@ public partial class SasipcaContext : DbContext
                 .ValueGeneratedOnAddOrUpdate()
                 .HasColumnType("datetime")
                 .HasColumnName("updated_at");
+        });
+
+        modelBuilder.Entity<UserDevice>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity.ToTable("user_device");
+
+            entity.HasIndex(e => e.UserId, "FK_user_device_users");
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedNever()
+                .HasColumnType("int(11)")
+                .HasColumnName("id");
+            entity.Property(e => e.FcmToken)
+                .HasMaxLength(100)
+                .HasDefaultValueSql("''")
+                .HasColumnName("fcm_token");
+            entity.Property(e => e.UpdatedAt)
+                .HasDefaultValueSql("current_timestamp()")
+                .HasColumnType("datetime")
+                .HasColumnName("updated_at");
+            entity.Property(e => e.UserId)
+                .HasColumnType("int(11)")
+                .HasColumnName("user_id");
+
+            entity.HasOne(d => d.User).WithMany(p => p.UserDevices)
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("FK_user_device_users");
         });
 
         modelBuilder.Entity<VDeliveriesDetail>(entity =>
