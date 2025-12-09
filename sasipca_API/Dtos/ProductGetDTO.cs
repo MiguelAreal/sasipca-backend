@@ -49,6 +49,12 @@ namespace sasipca_API.Dtos
         /// </summary>
         public int? AvailableStock { get; set; }
 
+        /// <summary>
+        /// (opcional) Número de DIAS com que manda uma notificação a avisar
+        /// os utilizadores de algum grupo deste produto a expirar.
+        /// </summary>
+        public int? ExpNotif { get; set; }
+
         public List<ProductGroupDTO> ProductGroups { get; set; } = new List<ProductGroupDTO>();
 
     }

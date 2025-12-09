@@ -1020,6 +1020,9 @@ public partial class SasipcaContext : DbContext
             entity.Property(e => e.AvailableStock).HasPrecision(33);
             entity.Property(e => e.Barcode).HasMaxLength(255);
             entity.Property(e => e.CategoryId).HasColumnType("int(11)");
+            entity.Property(e => e.ExpNotif)
+                .HasComment("Com quantos dias de antecência deve avisar que um grupo do produto vai expirar")
+                .HasColumnType("int(4)");
             entity.Property(e => e.Name).HasMaxLength(255);
             entity.Property(e => e.ProductGroupId).HasColumnType("int(11)");
             entity.Property(e => e.ReservedQuantity).HasPrecision(32);

@@ -169,12 +169,13 @@ namespace sasipca_API.Controllers
                     Name = g.First().Name,
                     UnitSize = g.First().UnitSize,
                     CategoryId = g.First().CategoryId,
-                    UnitId = g.First().UnitId
+                    UnitId = g.First().UnitId,
+                    ExpNotif = g.First().ExpNotif
                 }).FirstOrDefault();
 
                 if (totalStock == null)
                 {
-                    // O produto existe, mas não tem lotes. Montar um DTO vazio.
+                    // O produto existe, mas não tem grupos. Montar um DTO vazio.
                     var simpleProduct = await _dbContext.Products
                         .Include(p => p.Category)
                         .Include(p => p.Unit)
@@ -186,6 +187,7 @@ namespace sasipca_API.Controllers
                             UnitSize = p.UnitSize,
                             CategoryId = p.Category.Id,
                             UnitId = p.Unit.Id,
+                            ExpNotif = p.ExpNotif,
                             ProductGroups = new List<ProductGroupDTO>(),
                             TotalQuantity = 0,
                             ReservedQuantity = 0,
@@ -212,6 +214,7 @@ namespace sasipca_API.Controllers
                     UnitSize = totalStock.UnitSize,
                     CategoryId = totalStock.CategoryId,
                     UnitId = totalStock.UnitId,
+                    ExpNotif = totalStock.ExpNotif,
 
                     // Totais Agregados
                     TotalQuantity = totalStock.TotalQuantity,
@@ -291,6 +294,7 @@ namespace sasipca_API.Controllers
                         product.CategoryId = dto.CategoryId.Value;
                     }
                 }
+
 
                 // Validação de Quantidade
                 if (dto.UnitSize.HasValue) product.UnitSize = dto.UnitSize.Value;

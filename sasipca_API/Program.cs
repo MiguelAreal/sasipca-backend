@@ -1,5 +1,6 @@
 using DotNetEnv;
-using Serilog;
+using FirebaseAdmin;
+using Google.Apis.Auth.OAuth2;
 using Hangfire;
 using Hangfire.MySql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -16,6 +17,7 @@ using sasipca_API.Middleware;
 using sasipca_API.Models;
 using sasipca_API.Services;
 using sasipca_API.Services.Interfaces;
+using Serilog;
 using Serilog;
 using System.Globalization;
 using System.Reflection;
@@ -66,6 +68,18 @@ namespace sasipca_API
             {
                 throw new InvalidOperationException("AZURE_CLIENT_ID is not set in environment variables.");
             }
+
+
+            var firebaseCredentialPath = "sasipca-2ea18-firebase-adminsdk-fbsvc-5d72cf6e66.json";
+
+            if (File.Exists(firebaseCredentialPath))
+            {
+                FirebaseApp.Create(new AppOptions()
+                {
+                    Credential = GoogleCredential.FromFile(firebaseCredentialPath)
+                });
+            }
+
 
             var builder = WebApplication.CreateBuilder(args);
             builder.Host.UseSerilog();
@@ -194,7 +208,7 @@ namespace sasipca_API
                 };
             });
 
-            // Adicionar a política de CORS para produção
+            // PRODUÇÃO
             /*builder.Services.AddCors(options =>
             {
                 options.AddPolicy("AllowAll", policy =>
@@ -212,7 +226,7 @@ namespace sasipca_API
             {
                 options.AddPolicy("AllowAll", policy =>
                 {
-                    policy.SetIsOriginAllowed(_ => true) // <--- O SEGREDO É ISTO
+                    policy.SetIsOriginAllowed(_ => true)
                           .AllowAnyHeader()
                           .AllowAnyMethod()
                           .AllowCredentials(); // Necessário para SignalR e Auth
@@ -300,7 +314,7 @@ namespace sasipca_API
                     {
                         name = name.Substring("sasipca_API.".Length);
                     }
-
+                        
                     return name;
                 });
 
@@ -312,7 +326,7 @@ namespace sasipca_API
 
 
             // Configure the HTTP request pipeline.
-            if (app.Environment.IsDevelopment())
+            /*if (app.Environment.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
                 app.UseSwagger();
@@ -324,7 +338,18 @@ namespace sasipca_API
                     c.ConfigObject.AdditionalItems["requestCredentials"] = "inclsude";
                 });
                 app.UseHangfireDashboard();
-            }
+            }*/
+
+            app.UseDeveloperExceptionPage();
+            app.UseSwagger();
+            app.UseSwaggerUI(c =>
+            {
+                c.SwaggerEndpoint("/swagger/v1/swagger.json", "sasipca API v1");
+
+                // Permite que o Swagger envie cookies junto com as requisições
+                c.ConfigObject.AdditionalItems["requestCredentials"] = "inclsude";
+            });
+            app.UseHangfireDashboard();
 
             // Definir a pasta raíz de uploads
             const string StorageRootFolder = "Storage";

@@ -15,6 +15,11 @@ public partial class VStockPerGroup
 
     public int? UnitSize { get; set; }
 
+    /// <summary>
+    /// Com quantos dias de antecência deve avisar que um grupo do produto vai expirar
+    /// </summary>
+    public int? ExpNotif { get; set; }
+
     public int ProductGroupId { get; set; }
 
     public DateOnly ExpiryDate { get; set; }
