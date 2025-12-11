@@ -684,6 +684,9 @@ public partial class SasipcaContext : DbContext
             entity.Property(e => e.StatusId)
                 .HasColumnType("int(11)")
                 .HasColumnName("status_id");
+            entity.Property(e => e.Title)
+                .HasMaxLength(50)
+                .HasColumnName("title");
             entity.Property(e => e.UserId)
                 .HasComment("User that the notification is for")
                 .HasColumnType("int(11)")
@@ -917,7 +920,7 @@ public partial class SasipcaContext : DbContext
                 .HasColumnType("int(11)")
                 .HasColumnName("id");
             entity.Property(e => e.FcmToken)
-                .HasMaxLength(100)
+                .HasMaxLength(1000)
                 .HasDefaultValueSql("''")
                 .HasColumnName("fcm_token");
             entity.Property(e => e.UpdatedAt)

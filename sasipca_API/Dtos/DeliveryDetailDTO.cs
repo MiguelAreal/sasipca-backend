@@ -20,7 +20,7 @@
         public string? BeneficiaryName { get; set; }
 
         // Itens
-        public List<DeliveryItemDTO> Items { get; set; } = new List<DeliveryItemDTO>();
+        public List<DeliveryItemGetDTO> Items { get; set; } = new List<DeliveryItemGetDTO>();
     }
 
 }

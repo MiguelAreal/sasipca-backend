@@ -10,7 +10,7 @@ public partial class Notification
     /// <summary>
     /// Create Time
     /// </summary>
-    public DateTime? CreatedAt { get; set; }
+    public DateTime CreatedAt { get; set; }
 
     public int StatusId { get; set; }
 
@@ -19,7 +19,9 @@ public partial class Notification
     /// </summary>
     public int UserId { get; set; }
 
-    public string? Message { get; set; }
+    public string Message { get; set; } = null!;
+
+    public string Title { get; set; } = null!;
 
     public virtual NotificationStatus Status { get; set; } = null!;
 

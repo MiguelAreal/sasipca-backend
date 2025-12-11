@@ -7,10 +7,9 @@
     public class NotificationGetDTO
     {
         public int Id { get; set; }
-        public string Message { get; set; }
-
-        public string Status { get; set; }
-        public DateTime? CreatedAt { get; set; } = DateTime.Now;
-
+        public string Title { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+        public DateTime Date { get; set; }
+        public bool IsRead { get; set; }
     }
 }

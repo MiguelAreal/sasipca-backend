@@ -199,6 +199,43 @@ namespace sasipca_API.Controllers
             return Ok(structuredResponse);
         }
 
+        // ----------------------------------------------------
+        // ENDPOINT 5: HISTÓRICO DE UM PRODUTO ESPECÍFICO
+        // ----------------------------------------------------
+        /// <summary>
+        /// Busca o histórico de movimentos onde um produto específico esteve envolvido.
+        /// Retorna os cabeçalhos dos movimentos (Data, Tipo, Utilizador, etc).
+        /// </summary>
+        /// <param name="barcode">Código de barras do produto.</param>
+        [HttpGet("products/{barcode}/history")]
+        [AuthorizeRole(UserRole.Admin)]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<VMovHistory>))]
+        public async Task<ActionResult<IEnumerable<VMovHistory>>> GetProductHistory(string barcode)
+        {
+            // 1. Encontrar IDs dos movimentos onde o produto participa
+            // Usamos a View de Detalhes para filtrar pelo Barcode
+            var movementIds = await _dbContext.VMovHistoryDetails
+                .Where(d => d.ProductBarcode == barcode)
+                .Select(d => d.MovementId)
+                .Distinct()
+                .ToListAsync();
+
+            if (!movementIds.Any())
+            {
+                return Ok(new List<VMovHistory>());
+            }
+
+            // 2. Buscar os cabeçalhos desses movimentos
+            // Usamos a View de Cabeçalhos (VMovHistory)
+            var history = await _dbContext.VMovHistories
+                .Where(h => movementIds.Contains(h.MovementId))
+                .OrderByDescending(h => h.MovementDate)
+                .ThenByDescending(h => h.MovementId)
+                .ToListAsync();
+
+            return Ok(history);
+        }
+
 
         // ----------------------------------------------------
         // FUNÇÃO PRIVADA DE ESTRUTURAÇÃO DA RESPOSTA
@@ -264,10 +301,10 @@ namespace sasipca_API.Controllers
                 BeneficiaryName = header.BeneficiaryName,
 
                 // Itens da entrega
-                Items = details.Select(d => new DeliveryItemDTO
+                Items = details.Select(d => new DeliveryItemGetDTO
                 {
-                    Barcode = d.ProductBarcode,
-                    groupId = d.ProductGroupId,
+                    Name = d.ProductName,
+                    ExpiryDate = d.GroupExpiryDate,
                     Quantity = d.ItemQuantity
                 }).ToList()
             };

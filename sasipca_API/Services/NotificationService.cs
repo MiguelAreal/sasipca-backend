@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using sasipca_API.DBModels;
+using sasipca_API.Dtos;
 using sasipca_API.Enumerators;
 using sasipca_API.Hubs;
 using sasipca_API.Services.Interfaces;
@@ -41,7 +42,8 @@ namespace sasipca_API.Services
             var notif = new DBModels.Notification
             {
                 UserId = userId,
-                Message = $"{title}: {message}",
+                Title = title,
+                Message = message,
                 StatusId = (int)Enums.NotificationStatus.NaoLida
             };
             _dbContext.Notifications.Add(notif);
@@ -94,7 +96,8 @@ namespace sasipca_API.Services
             var notifications = allUserIds.Select(uid => new DBModels.Notification
             {
                 UserId = uid,
-                Message = $"{title}: {message}",
+                Title = title,
+                Message = message,
                 StatusId = (int)Enums.NotificationStatus.NaoLida
             });
 
@@ -123,6 +126,59 @@ namespace sasipca_API.Services
             {
                 _logger.LogError($"Erro Firebase Broadcast: {ex.Message}");
             }
+        }
+
+        public async Task<List<NotificationGetDTO>> GetUserNotificationsAsync(int userId)
+        {
+            // Busca notificações que NÃO estejam arquivadas
+            // Ordena da mais recente para a mais antiga
+            return await _dbContext.Notifications
+                .Where(n => n.UserId == userId && n.StatusId != (int)Enums.NotificationStatus.Arquivada)
+                .OrderByDescending(n => n.CreatedAt)
+                .Select(n => new NotificationGetDTO
+                {
+                    Id = n.Id,
+                    Title = n.Title,
+                    Message = n.Message,
+                    Date = n.CreatedAt,
+                    IsRead = n.StatusId == (int)Enums.NotificationStatus.Lida
+                })
+                .ToListAsync();
+        }
+
+        public async Task<int> GetUnreadCountAsync(int userId)
+        {
+            return await _dbContext.Notifications
+                .CountAsync(n => n.UserId == userId && n.StatusId == (int)Enums.NotificationStatus.NaoLida);
+        }
+
+        public async Task<bool> MarkAsReadAsync(int notificationId, int userId)
+        {
+            var notif = await _dbContext.Notifications
+                .FirstOrDefaultAsync(n => n.Id == notificationId && n.UserId == userId);
+
+            if (notif == null) return false;
+
+            // Só atualiza se ainda não estiver lida para poupar escrita
+            if (notif.StatusId == (int)Enums.NotificationStatus.NaoLida)
+            {
+                notif.StatusId = (int)Enums.NotificationStatus.Lida;
+                await _dbContext.SaveChangesAsync();
+            }
+            return true;
+        }
+
+        public async Task<bool> ArchiveNotificationAsync(int notificationId, int userId)
+        {
+            var notif = await _dbContext.Notifications
+                .FirstOrDefaultAsync(n => n.Id == notificationId && n.UserId == userId);
+
+            if (notif == null) return false;
+
+            // Arquivar ("Apagar" logicamente)
+            notif.StatusId = (int)Enums.NotificationStatus.Arquivada;
+            await _dbContext.SaveChangesAsync();
+            return true;
         }
     }
 }

@@ -1,23 +1,87 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using sasipca_API.Dtos;
+using sasipca_API.Models;
 using sasipca_API.Services.Interfaces;
-using System.Security.Claims;
-using sasipca_API.Models; // Para usar a classe Resposta se a tiveres, senão usa objectos anónimos
 
 namespace sasipca_API.Controllers
 {
     [Route("api/notifications")]
     [ApiController]
-    [Authorize] // Garante que apenas users logados acedem
+    [Authorize]
     public class NotificationsController : ControllerBase
     {
         private readonly INotificationService _service;
         private readonly ILogger<NotificationsController> _logger;
+        private readonly IAuthService _authService;
 
-        public NotificationsController(INotificationService service, ILogger<NotificationsController> logger)
+        public NotificationsController(INotificationService service, IAuthService authService, ILogger<NotificationsController> logger)
         {
             _service = service;
+            _authService = authService;
             _logger = logger;
+        }
+
+        // ----------------------------------------------------
+        // OBTER LISTA DE NOTIFICAÇÕES (INBOX)
+        // ----------------------------------------------------
+        [HttpGet]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<NotificationGetDTO>))]
+        public async Task<ActionResult<List<NotificationGetDTO>>> GetNotifications()
+        {
+            int? userId = _authService.GetUserId();
+            if (userId == null) return Unauthorized(new Resposta("Utilizador não autenticado."));
+
+            var notifications = await _service.GetUserNotificationsAsync(userId.Value);
+            return Ok(notifications);
+        }
+
+        // ----------------------------------------------------
+        // OBTER CONTAGEM DE NÃO LIDAS (BADGE)
+        // ----------------------------------------------------
+        [HttpGet("unread-count")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(int))]
+        public async Task<ActionResult<int>> GetUnreadCount()
+        {
+            int? userId = _authService.GetUserId();
+            if (userId == null) return Unauthorized(new Resposta("Utilizador não autenticado."));
+
+            var count = await _service.GetUnreadCountAsync(userId.Value);
+            return Ok(count);
+        }
+
+        // ----------------------------------------------------
+        // MARCAR COMO LIDA
+        // ----------------------------------------------------
+        [HttpPut("{id}/read")]
+        public async Task<IActionResult> MarkAsRead(int id)
+        {
+            int? userId = _authService.GetUserId();
+            if (userId == null) return Unauthorized(new Resposta("Utilizador não autenticado."));
+
+            var success = await _service.MarkAsReadAsync(id, userId.Value);
+
+            if (!success)
+                return NotFound(new { message = "Notificação não encontrada." });
+
+            return Ok();
+        }
+
+        // ----------------------------------------------------
+        // APAGAR (ARQUIVAR)
+        // ----------------------------------------------------
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> ArchiveNotification(int id)
+        {
+            int? userId = _authService.GetUserId();
+            if (userId == null) return Unauthorized(new Resposta("Utilizador não autenticado."));
+
+            var success = await _service.ArchiveNotificationAsync(id, userId.Value);
+
+            if (!success)
+                return NotFound(new { message = "Notificação não encontrada." });
+
+            return Ok(new { message = "Notificação arquivada." });
         }
 
         // ----------------------------------------------------
@@ -29,20 +93,15 @@ namespace sasipca_API.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> RegisterDevice([FromBody] DeviceTokenDTO dto)
         {
-            // 1. Validação básica do body
+            // 1. Validar autenticação
+            int? userId = _authService.GetUserId();
+            if (userId == null) return Unauthorized(new Resposta("Utilizador não autenticado."));
+
+            // 2. Validar body
             if (dto == null || string.IsNullOrWhiteSpace(dto.Token))
             {
-                _logger.LogWarning("Tentativa de registo de dispositivo sem token.");
+                _logger.LogWarning($"User {userId} tentou registar dispositivo sem token.");
                 return BadRequest(new { message = "O token é obrigatório." });
-            }
-
-            // 2. Extrair ID do utilizador do Token JWT
-            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out int userId))
-            {
-                _logger.LogError("Token JWT inválido ou sem NameIdentifier.");
-                return Unauthorized();
             }
 
             try
@@ -50,7 +109,7 @@ namespace sasipca_API.Controllers
                 _logger.LogInformation($"A registar token FCM para o User {userId}...");
 
                 // 3. Chamar o serviço
-                await _service.RegisterDeviceAsync(userId, dto.Token);
+                await _service.RegisterDeviceAsync(userId.Value, dto.Token);
 
                 _logger.LogInformation($"Sucesso: Token registado para User {userId}.");
                 return Ok(new { message = "Dispositivo registado com sucesso." });
@@ -84,20 +143,4 @@ namespace sasipca_API.Controllers
         }
     }
 
-    // ----------------------------------------------------
-    // DTOs (Data Transfer Objects)
-    // ----------------------------------------------------
-
-    // Este DTO tem de bater certo com o JSON enviado pelo Kotlin: {"token": "..."}
-    public class DeviceTokenDTO
-    {
-        public string Token { get; set; }
-    }
-
-    public class TestNotificationDTO
-    {
-        public int TargetUserId { get; set; }
-        public string Title { get; set; }
-        public string Message { get; set; }
-    }
 }
