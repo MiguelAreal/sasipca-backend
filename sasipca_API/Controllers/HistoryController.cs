@@ -304,6 +304,8 @@ namespace sasipca_API.Controllers
                 Items = details.Select(d => new DeliveryItemGetDTO
                 {
                     Name = d.ProductName,
+                    Barcode = d.ProductBarcode,
+                    GroupId = d.ProductGroupId,
                     ExpiryDate = d.GroupExpiryDate,
                     Quantity = d.ItemQuantity
                 }).ToList()

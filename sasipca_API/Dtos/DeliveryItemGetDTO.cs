@@ -1,5 +1,4 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using Xunit.Sdk;
 
 namespace sasipca_API.Dtos
 {
@@ -9,9 +8,19 @@ namespace sasipca_API.Dtos
     public class DeliveryItemGetDTO
     {
         /// <summary>
-        /// Nome do produto que entregue.
+        /// Nome do produto entregue.
         /// </summary>
         public string Name { get; set; } = null!;
+
+        /// <summary>
+        /// Código de Barras do produto (para edição).
+        /// </summary>
+        public string? Barcode { get; set; }
+
+        /// <summary>
+        /// ID do Grupo/Lote (para edição).
+        /// </summary>
+        public int? GroupId { get; set; }
 
         /// <summary>
         /// Validade do grupo específico

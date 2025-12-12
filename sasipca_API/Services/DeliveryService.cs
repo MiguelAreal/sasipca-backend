@@ -224,11 +224,10 @@ namespace sasipca_API.Services
             try
             {
                 var delivery = await _dbContext.Deliveries
-                    .Include(d => d.DeliveryItems)
+                    .Include(d => d.DeliveryItems) // Importante carregar os itens para os poder remover
                     .FirstOrDefaultAsync(d => d.Id == deliveryId);
 
                 if (delivery == null) return (false, new Resposta($"Entrega com ID {deliveryId} não encontrado."));
-
 
                 // 1. VALIDAÇÃO DE ESTADO (Estados Finais não podem mudar)
                 if (delivery.StatusId == (int)Enums.DeliveryStatus.Entregue || delivery.StatusId == (int)Enums.DeliveryStatus.Cancelada)
@@ -237,8 +236,6 @@ namespace sasipca_API.Services
                     return (false, new Resposta($"A entrega está em estado final ('{((Enums.DeliveryStatus)delivery.StatusId)}') e não pode ser alterada."));
                 }
 
-                var oldStatus = delivery.StatusId;
-
                 var newStatus = dto.NewStatusId;
 
                 // Variáveis para atualização
@@ -246,72 +243,94 @@ namespace sasipca_API.Services
                 var groupsToUpdate = new List<ProductGroup>();
                 Movement? newMovement = null;
 
-                // 3. PROCESSAMENTO DA TRANSIÇÃO DE ESTADO
+                // 2. PROCESSAMENTO DA TRANSIÇÃO DE ESTADO
                 if (newStatus == (int)Enums.DeliveryStatus.Cancelada)
                 {
-                    // 3.1. Cancelar: Apenas atualizar o status e nota.
+                    // 2.1. Cancelar:
+                    // Se cancelarmos, libertamos a reserva. 
+                    // Se apagarmos os items aqui ou apenas mudarmos o status, o efeito no cálculo "Disponível" é o mesmo
+                    // (porque a query de stock disponível filtra apenas StatusId=Agendada).
+                    // No entanto, para histórico, mantemos os itens que estavam previstos ou limpamos? 
+                    // Geralmente mantém-se o registo, mudando apenas o status.
+
                     delivery.StatusId = (int)Enums.DeliveryStatus.Cancelada;
                     delivery.Note = dto.Note ?? delivery.Note;
                 }
-                else if (newStatus == (int)Enums.DeliveryStatus.Entregue)
+                else
                 {
-                    // 3.2. ENTREGUE: Requer validação de STOCK/VALIDADE e DEDUÇÃO imediata.
+                    // SEJA "ENTREGUE" OU "AGENDADA" (UPDATE):
+                    // A lista de itens que vem do DTO é a nova "Verdade".
+                    // Temos de substituir o que estava na BD pelo que veio do Frontend.
 
-                    // a) Criar cabeçalho de Movimentação (Saída)
-                    newMovement = new Movement
+                    // [CORREÇÃO CRÍTICA] - Limpar itens antigos para evitar duplicação/soma
+                    if (delivery.DeliveryItems.Any())
                     {
-                        UserId = userId,
-                        MovementTypeId = (int)Enums.MovementTypes.Saida,
-                        Delivery = delivery,
-                        Note = dto.Note
-                    };
-                    _dbContext.Movements.Add(newMovement);
-
-                    // b) Processar Itens com dedução de stock
-                    var (success, result) = await ProcessDeliveryItems(
-                        delivery,
-                        dto.ItemsToDeliver,
-                        newScheduledDate,
-                        newMovement,
-                        groupsToUpdate);
-
-                    if (!success)
-                    {
-                        await transaction.RollbackAsync();
-                        return (false, result);
+                        _dbContext.DeliveryItems.RemoveRange(delivery.DeliveryItems);
                     }
 
-                    // c) Atualizar status e nota
-                    delivery.StatusId = (int)Enums.DeliveryStatus.Entregue;
-                    delivery.Note = dto.Note ?? delivery.Note;
-                }
-                else // Status permanece Agendada (newStatus == DeliveryStatus.Agendada)
-                {
-                    // 3.3. RE-AGENDAR/ATUALIZAR ITENS: Requer validação (sem dedução de stock)
+                    // Agora processamos os itens como se fossem novos.
 
-                    // a) Processar Itens sem dedução de stock (apenas validação e criação de reserva)
-                    var (success, result) = await ProcessDeliveryItems(
-                        delivery,
-                        dto.ItemsToDeliver,
-                        newScheduledDate,
-                        null, // newMovement = null -> SEM DEDUÇÃO
-                        groupsToUpdate);
-
-                    if (!success)
+                    if (newStatus == (int)Enums.DeliveryStatus.Entregue)
                     {
-                        await transaction.RollbackAsync();
-                        return (false, result);
+                        // 2.2. MUDAR PARA ENTREGUE (Saída Imediata)
+
+                        // a) Criar cabeçalho de Movimentação (Saída)
+                        newMovement = new Movement
+                        {
+                            UserId = userId,
+                            MovementTypeId = (int)Enums.MovementTypes.Saida,
+                            Delivery = delivery,
+                            Note = dto.Note ?? delivery.Note
+                        };
+                        _dbContext.Movements.Add(newMovement);
+
+                        // b) Processar Itens com dedução de stock (newMovement != null)
+                        var (success, result) = await ProcessDeliveryItems(
+                            delivery,
+                            dto.ItemsToDeliver,
+                            newScheduledDate,
+                            newMovement,
+                            groupsToUpdate);
+
+                        if (!success)
+                        {
+                            await transaction.RollbackAsync();
+                            return (false, result);
+                        }
+
+                        delivery.StatusId = (int)Enums.DeliveryStatus.Entregue;
+                    }
+                    else // newStatus == Agendada (Update normal)
+                    {
+                        // 2.3. APENAS ATUALIZAR / RE-AGENDAR
+
+                        // a) Processar Itens SEM dedução (newMovement = null)
+                        var (success, result) = await ProcessDeliveryItems(
+                            delivery,
+                            dto.ItemsToDeliver,
+                            newScheduledDate,
+                            null,
+                            groupsToUpdate);
+
+                        if (!success)
+                        {
+                            await transaction.RollbackAsync();
+                            return (false, result);
+                        }
+
+                        // Reagendar Job se a data mudou ou se é um update
+                        _jobScheduler.ScheduleDeliveryCheck(delivery.Id, newScheduledDate);
                     }
 
-                    // b) Atualizar Data e Nota e reagendar verificação
+                    // Atualizar dados de cabeçalho comuns
                     delivery.ScheduledDate = newScheduledDate;
                     delivery.Note = dto.Note ?? delivery.Note;
-                    _jobScheduler.ScheduleDeliveryCheck(delivery.Id, delivery.ScheduledDate);
                 }
 
+                // 3. Finalizar transação
 
-                // 4. Finalizar transação
-                if (newMovement != null)
+                // Se houve dedução de stock (Entregue), atualizar os grupos
+                if (newMovement != null && groupsToUpdate.Any())
                 {
                     _dbContext.ProductGroups.UpdateRange(groupsToUpdate);
                 }
@@ -319,12 +338,13 @@ namespace sasipca_API.Services
                 await _dbContext.SaveChangesAsync();
                 await transaction.CommitAsync();
 
-                return (true, new Resposta($"Entrega ID {deliveryId} atualizada para o status '{newStatus}' com sucesso."));
+                return (true, new Resposta($"Entrega ID {deliveryId} atualizada para o status '{(Enums.DeliveryStatus)newStatus}' com sucesso."));
             }
             catch (Exception ex)
             {
                 await transaction.RollbackAsync();
-                return (false, new Resposta("Ocorreu um erro interno ao processar a atualização da entrega."));
+                // Logar ex.Message se possível
+                return (false, new Resposta($"Ocorreu um erro interno ao atualizar a entrega: {ex.Message}"));
             }
         }
 

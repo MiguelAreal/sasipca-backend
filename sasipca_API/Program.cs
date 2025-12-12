@@ -209,29 +209,23 @@ namespace sasipca_API
             });
 
             // PRODUÇÃO
-            /*builder.Services.AddCors(options =>
-            {
-                options.AddPolicy("AllowAll", policy =>
-                {
-                    policy.SetIsOriginAllowed(origin =>
-                        origin.StartsWith("http://localhost") || origin.EndsWith(".azurestaticapps.net"))
-                        .AllowAnyHeader()
-                        .AllowAnyMethod()
-                        .AllowCredentials();
-                });
-            });*/
-
-            //DESENVOLVIMENTO
             builder.Services.AddCors(options =>
             {
                 options.AddPolicy("AllowAll", policy =>
                 {
-                    policy.SetIsOriginAllowed(_ => true)
-                          .AllowAnyHeader()
-                          .AllowAnyMethod()
-                          .AllowCredentials(); // Necessário para SignalR e Auth
+                    policy.SetIsOriginAllowed(origin =>
+                    {
+                        if (string.IsNullOrWhiteSpace(origin)) return false;
+                        if (origin.Contains("localhost")) return true;
+                        if (origin.EndsWith("rapi.tail1fcae6.ts.net")) return true;
+                        return false;
+                    })
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()
+                    .AllowCredentials();
                 });
             });
+
 
             // Rate Limiting
             builder.Services.AddRateLimiter(options =>
@@ -324,9 +318,14 @@ namespace sasipca_API
 
             var app = builder.Build();
 
+            app.UseForwardedHeaders(new ForwardedHeadersOptions
+            {
+                ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+            });
+
 
             // Configure the HTTP request pipeline.
-            /*if (app.Environment.IsDevelopment())
+            if (app.Environment.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
                 app.UseSwagger();
@@ -338,18 +337,7 @@ namespace sasipca_API
                     c.ConfigObject.AdditionalItems["requestCredentials"] = "inclsude";
                 });
                 app.UseHangfireDashboard();
-            }*/
-
-            app.UseDeveloperExceptionPage();
-            app.UseSwagger();
-            app.UseSwaggerUI(c =>
-            {
-                c.SwaggerEndpoint("/swagger/v1/swagger.json", "sasipca API v1");
-
-                // Permite que o Swagger envie cookies junto com as requisições
-                c.ConfigObject.AdditionalItems["requestCredentials"] = "inclsude";
-            });
-            app.UseHangfireDashboard();
+            }            
 
             // Definir a pasta raíz de uploads
             const string StorageRootFolder = "Storage";
@@ -374,17 +362,13 @@ namespace sasipca_API
 
             app.UseHttpsRedirection();
             app.UseRouting();
-            app.UseCors("AllowAll");
-            app.UseWebSockets();
-            app.MapHub<NotificationHub>("/notification-hub");
+            app.UseCors("AllowAll");          
             app.UseAuthentication();
             app.UseAuthorization();
             app.UseRateLimiter();
+            app.UseWebSockets();
+            app.MapHub<NotificationHub>("/api/notification-hub");
             app.MapControllers();
-            app.UseForwardedHeaders(new ForwardedHeadersOptions
-            {
-                ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
-            });
             app.Run();
         }
     }

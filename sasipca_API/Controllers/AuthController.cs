@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
+using sasipca_API.Attributes;
 using sasipca_API.DBModels;
 using sasipca_API.Dtos;
 using sasipca_API.Enumerators; // Importante para o Enum
@@ -31,19 +32,23 @@ namespace sasipca_API.Controllers
             _refreshTokenValidityMinutes = int.Parse(config["Jwt:RefreshTokenValidityInMinutes"] ?? "10080"); // 7 dias default
         }
 
-        [HttpPost("login/microsoft")]
+        [HttpPost("login")]
         [AllowAnonymous]
         public async Task<IActionResult> LoginMicrosoft([FromBody] MicrosoftLoginDTO loginDto)
         {
             var azureClientId = Environment.GetEnvironmentVariable("AZURE_CLIENT_ID");
 
             if (string.IsNullOrEmpty(loginDto.IdToken))
-                return BadRequest(new Resposta("Microsoft id_token não fornecido."));
+                return BadRequest(new Resposta("IdToken não fornecido."));
 
             try
             {
-                // 1. Validação do token Microsoft
+                // 1. Configuração e Validação do Token
                 var handler = new JwtSecurityTokenHandler();
+
+                // Nota: O JwtSecurityTokenHandler por defeito tenta mapear claims (ex: "name" -> ClaimTypes.Name).
+                // Para garantir que lemos as claims RAW, podemos desativar o mapeamento
+
                 var configManager = new ConfigurationManager<OpenIdConnectConfiguration>(
                     "https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration",
                     new OpenIdConnectConfigurationRetriever());
@@ -63,94 +68,96 @@ namespace sasipca_API.Controllers
 
                 var principal = handler.ValidateToken(loginDto.IdToken, validationParameters, out var validatedToken);
 
-                // 2. Extrair dados do Token
+                // =================================================================================
+                // 2. EXTRAÇÃO DE DADOS OTIMIZADA (Baseada no Token)
+                // =================================================================================
+
+                // EMAIL
                 var email = principal.FindFirst("preferred_username")?.Value
-                            ?? principal.FindFirst("upn")?.Value
                             ?? principal.FindFirst("email")?.Value;
 
                 if (string.IsNullOrEmpty(email) || !email.EndsWith("ipca.pt"))
-                    return Unauthorized(new Resposta("Utilizador não autorizado (domínio inválido)."));
+                    return Unauthorized(new Resposta("Domínio de e-mail inválido."));
 
-                // Extrair número mecanográfico (a12345 -> 12345)
-                var mecanograficoStr = email.Split('@')[0].TrimStart('a', 'A');
-                if (!int.TryParse(mecanograficoStr, out int mecanografico))
-                    return Unauthorized(new Resposta("Número mecanográfico inválido."));
+                // NOME
+                var rawName = principal.FindFirst("name")?.Value ?? principal.FindFirst(ClaimTypes.Name)?.Value;
+                string nomeFormatado = "Utilizador";
 
-                // Dados extra do token
-                var nomeDoToken = principal.FindFirst("name")?.Value
-                                ?? (principal.FindFirst("given_name")?.Value + " " + principal.FindFirst("family_name")?.Value);
+                if (!string.IsNullOrEmpty(rawName))
+                {
+                    var parts = rawName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length >= 2)
+                    {
+                        // Pega o Primeiro e o Último (Ex: "Miguel" + "Areal")
+                        nomeFormatado = $"{parts[0]} {parts[^1]}";
+                    }
+                    else
+                    {
+                        nomeFormatado = rawName;
+                    }
+                }
 
                 // =================================================================================
-                // 3. LÓGICA HÍBRIDA: ADMIN (Users) vs ALUNO (Beneficiaries)
+                // 3. LÓGICA DE PRIORIDADE (Admin > Beneficiário)
                 // =================================================================================
 
                 UserRole role;
-                int internalId; // O ID da base de dados (PK)
+                int internalId;
                 string userName;
-                DateTime refreshTokenExp = DateTime.Now.AddMinutes(_refreshTokenValidityMinutes);
                 string refreshToken = GenerateRefreshTokenString();
+                DateTime refreshTokenExp = DateTime.Now.AddMinutes(_refreshTokenValidityMinutes);
 
-                // A. Tentar encontrar na tabela USERS (Admins/Staff)
-                // Assumimos que na tabela Users o ID é o número mecanográfico
-                var adminUser = await _dbcontext.Users.FindAsync(mecanografico);
+                // A. Verificar ADMIN
+                var adminUser = await _dbcontext.Users.FirstOrDefaultAsync(u => u.Email == email);
 
                 if (adminUser != null)
                 {
                     role = UserRole.Admin;
                     internalId = adminUser.Id;
-                    userName = adminUser.Name ?? nomeDoToken ?? "Admin";
+                    userName = adminUser.Name ?? nomeFormatado; // Usa o da BD se existir, senão usa o do token
 
-                    // Atualizar info se necessário
-                    if (!string.IsNullOrEmpty(nomeDoToken) && adminUser.Name != nomeDoToken) adminUser.Name = nomeDoToken;
-                    adminUser.Email = email;
+                    // Se for o primeiro login (nome null na BD) ou quisermos atualizar sempre:
+                    if (adminUser.Name != nomeFormatado)
+                        adminUser.Name = nomeFormatado;
 
-                    // Guardar Refresh Token
                     adminUser.RefreshToken = refreshToken;
                     adminUser.RefreshTokenExp = refreshTokenExp;
                 }
                 else
                 {
-                    // B. Se não é Admin, tentar encontrar na tabela BENEFICIARIES
-                    // Na tabela Beneficiaries, procuramos pelo campo StudentNum
-                    var beneficiary = await _dbcontext.Beneficiaries
-                                            .FirstOrDefaultAsync(b => b.StudentNum == mecanografico);
+                    // B. Verificar BENEFICIÁRIO
+                    var beneficiary = await _dbcontext.Beneficiaries.FirstOrDefaultAsync(b => b.Email == email);
 
                     if (beneficiary != null)
                     {
                         role = UserRole.Beneficiary;
-                        internalId = beneficiary.Id; // Usamos o PK da tabela (que é auto-increment)
-                        userName = beneficiary.Name;
+                        internalId = beneficiary.Id;
+                        userName = beneficiary.Name; // Beneficiários usam o nome registado na BD
 
-                        // Guardar Refresh Token
                         beneficiary.RefreshToken = refreshToken;
                         beneficiary.RefreshTokenExp = refreshTokenExp;
                     }
                     else
                     {
-                        return Unauthorized(new Resposta("Utilizador não registado no sistema (nem staff, nem aluno)."));
+                        return Unauthorized(new Resposta("Utilizador não registado no sistema."));
                     }
                 }
 
-                // 4. Gravar Alterações na BD
+                // 4. Gravar na BD
                 await _dbcontext.SaveChangesAsync();
 
-                // 5. Gerar Tokens
+                // 5. Gerar Tokens e Retornar
                 var accessToken = _jwtService.GenerateToken(internalId, email, role.ToString());
-
-                // 6. Setar Cookie
                 SetRefreshTokenCookie(refreshToken, refreshTokenExp);
 
                 return Ok(new AuthResponse(accessToken, refreshToken, internalId, userName, role.ToString()));
             }
-            catch (SecurityTokenValidationException stvEx)
-            {
-                return Unauthorized(new Resposta($"Token inválido: {stvEx.Message}"));
-            }
             catch (Exception ex)
             {
-                return BadRequest(new Resposta($"Erro no login Microsoft: {ex.Message}"));
+                return BadRequest(new Resposta($"Erro na autenticação: {ex.Message}"));
             }
         }
+
 
         [HttpPost("refresh")]
         [AllowAnonymous]
@@ -263,6 +270,9 @@ namespace sasipca_API.Controllers
 
             return Ok(new Resposta("Sessão terminada com sucesso."));
         }
+
+
+        
 
         // --- Helpers ---
 
