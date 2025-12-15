@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using sasipca_API.Attributes;
 using sasipca_API.DBModels;
@@ -10,7 +11,6 @@ namespace sasipca_API.Controllers
 {
     [Route("api/stats")]
     [ApiController]
-    [AuthorizeRole(UserRole.Admin)] // Apenas Admins veem estatísticas
     public class StatsController : ControllerBase
     {
         private readonly SasipcaContext _context;
@@ -24,6 +24,7 @@ namespace sasipca_API.Controllers
         // 1. DASHBOARD SUMMARY (KPIs)
         // ---------------------------------------------------------
         [HttpGet("summary")]
+        [AuthorizeRole(UserRole.Admin)]
         public async Task<ActionResult<DashboardSummaryDTO>> GetSummary()
         {
             var today = DateOnly.FromDateTime(DateTime.Now);
@@ -67,6 +68,7 @@ namespace sasipca_API.Controllers
         // 2. FLUXO DE STOCK (Entradas vs Saídas) - Gráfico de Linhas
         // ---------------------------------------------------------
         [HttpGet("movements-flow")]
+        [AuthorizeRole(UserRole.Admin)]
         public async Task<ActionResult<List<ChartDataPoint>>> GetMovementsFlow([FromQuery] DateRangeFilterDTO filter)
         {
             var query = _context.VStatsDailymovements.AsQueryable();
@@ -113,6 +115,7 @@ namespace sasipca_API.Controllers
         // 3. TOP PRODUTOS MAIS ENTREGUES - Gráfico de Barras/Pie
         // ---------------------------------------------------------
         [HttpGet("top-products")]
+        [AuthorizeRole(UserRole.Admin)]
         public async Task<ActionResult<List<ChartDataPoint>>> GetTopProducts([FromQuery] DateRangeFilterDTO filter, [FromQuery] int topN = 5)
         {
             var query = _context.VStatsDailymovements
@@ -155,6 +158,7 @@ namespace sasipca_API.Controllers
         // 4. ENTREGAS POR CATEGORIA - Gráfico de Donut
         // ---------------------------------------------------------
         [HttpGet("categories-distribution")]
+        [AuthorizeRole(UserRole.Admin)]
         public async Task<ActionResult<List<ChartDataPoint>>> GetCategoriesDistribution([FromQuery] DateRangeFilterDTO filter)
         {
             var query = _context.VStatsDailymovements
@@ -195,6 +199,7 @@ namespace sasipca_API.Controllers
         // 5. RESUMO MENSAL (PARA A HOMEPAGE)
         // ---------------------------------------------------------
         [HttpGet("monthly-summary")]
+        [AuthorizeRole(UserRole.Admin)]
         public async Task<ActionResult<MonthlySummaryDTO>> GetMonthlySummary([FromQuery] int month, [FromQuery] int year)
         {
             // Datas limite do mês
@@ -230,6 +235,32 @@ namespace sasipca_API.Controllers
                 RealizedDeliveries = realized,
                 DonationsReceived = donationsReceived
             });
+        }
+
+        // ---------------------------------------------------------
+        // 6. STOCK TOTAL POR CATEGORIA (PÚBLICO)
+        // ---------------------------------------------------------
+        [HttpGet("stock-by-category")]
+        [AllowAnonymous]
+        public async Task<ActionResult<List<ChartDataPoint>>> GetStockByCategory()
+        {
+            // Usamos a tabela Products e ProductGroups para calcular o stock real atual
+            var data = await _context.Products
+                .Include(p => p.Category)
+                .Include(p => p.ProductGroups)
+                .GroupBy(p => p.Category.Type) // Agrupa pelo nome da categoria
+                .Select(g => new ChartDataPoint
+                {
+                    Label = g.Key ?? "Sem Categoria",
+                    // Soma a quantidade de todos os grupos de todos os produtos dessa categoria
+                    Value = g.Sum(p => p.ProductGroups.Sum(pg => pg.Quantity)),
+                    Series = "Stock Atual"
+                })
+                .Where(x => x.Value > 0) // Opcional: Mostra apenas categorias com stock
+                .OrderByDescending(x => x.Value)
+                .ToListAsync();
+
+            return Ok(data);
         }
     }
 }

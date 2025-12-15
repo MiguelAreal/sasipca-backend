@@ -235,7 +235,7 @@ namespace sasipca_API
                         httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                         key => new FixedWindowRateLimiterOptions
                         {
-                            PermitLimit = 45, // Máximo de 45 requisições...
+                            PermitLimit = 70, // Máximo de 70 requisições...
                             Window = TimeSpan.FromSeconds(60), // ...a cada 60 segundos
                             QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                             QueueLimit = 2 // Se o limite for atingido, mais 2 requisições podem ser enfileiradas
@@ -356,7 +356,7 @@ namespace sasipca_API
             {
                 // O RequestPath define o prefixo URL que o cliente usará (ex: https://api.exemplo.com/static/CampaignImages/imagem.jpg)
                 FileProvider = new PhysicalFileProvider(storagePath),
-                RequestPath = "/static"
+                RequestPath = "/api/static"
             });
 
 

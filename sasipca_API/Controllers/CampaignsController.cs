@@ -12,7 +12,6 @@ namespace sasipca_API.Controllers
 {
     [Route("api/campaigns")]
     [ApiController]
-    [AuthorizeRole(UserRole.Admin)]
     public class CampaignsController : ControllerBase
     {
         private readonly SasipcaContext _dbContext;
@@ -32,6 +31,8 @@ namespace sasipca_API.Controllers
         [Consumes("multipart/form-data")]
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(Resposta))]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(Resposta))]
+        [Authorize]
+        [AuthorizeRole(UserRole.Admin)]
         public async Task<ActionResult> CreateCampaign([FromForm] CampaignPostDTO dto)
         {
             // 1. Validação
@@ -89,6 +90,8 @@ namespace sasipca_API.Controllers
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(Resposta))]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(Resposta))]
         [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(Resposta))]
+        [Authorize]
+        [AuthorizeRole(UserRole.Admin)]
         public async Task<ActionResult> UpdateCampaign(int campaignId, [FromForm] CampaignPutDTO dto)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
@@ -156,6 +159,7 @@ namespace sasipca_API.Controllers
         /// </summary>
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PaginatedResponse<CampaignHeaderDTO>))]
+        [AllowAnonymous]
         public async Task<ActionResult<PaginatedResponse<CampaignHeaderDTO>>> GetCampaigns(
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10,
@@ -243,6 +247,7 @@ namespace sasipca_API.Controllers
         [HttpGet("{campaignId}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(CampaignHeaderDTO))]
         [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(Resposta))]
+        [AllowAnonymous]
         public async Task<ActionResult<CampaignHeaderDTO>> GetCampaign(int campaignId)
         {
             var campaign = await _dbContext.Campaigns
@@ -280,6 +285,8 @@ namespace sasipca_API.Controllers
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(Resposta))]
         [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(Resposta))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError, Type = typeof(Resposta))]
+        [Authorize]
+        [AuthorizeRole(UserRole.Admin)]
         public async Task<ActionResult<Resposta>> DeleteCampaign(int campaignId)
         {
             try
@@ -321,7 +328,7 @@ namespace sasipca_API.Controllers
             var request = HttpContext.Request;
             var baseUrl = $"{request.Scheme}://{request.Host}{request.PathBase}";
 
-            return $"{baseUrl}/static/{ImageSubdirectory}/{fileName}";
+            return $"{baseUrl}/api/static/{ImageSubdirectory}/{fileName}";
         }
         #endregion
     }
