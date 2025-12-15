@@ -83,6 +83,8 @@ public partial class SasipcaContext : DbContext
 
     public virtual DbSet<VMovHistoryDetail> VMovHistoryDetails { get; set; }
 
+    public virtual DbSet<VStatsDailymovement> VStatsDailymovements { get; set; }
+
     public virtual DbSet<VStockPerGroup> VStockPerGroups { get; set; }
 
     public virtual DbSet<VStockPerProduct> VStockPerProducts { get; set; }
@@ -883,7 +885,6 @@ public partial class SasipcaContext : DbContext
             entity.HasIndex(e => e.Email, "email").IsUnique();
 
             entity.Property(e => e.Id)
-                .ValueGeneratedNever()
                 .HasColumnType("int(11)")
                 .HasColumnName("id");
             entity.Property(e => e.Contact).HasColumnName("contact");
@@ -1012,6 +1013,28 @@ public partial class SasipcaContext : DbContext
             entity.Property(e => e.ProductName).HasMaxLength(255);
             entity.Property(e => e.UserId).HasColumnType("int(11)");
             entity.Property(e => e.UserName).HasMaxLength(255);
+        });
+
+        modelBuilder.Entity<VStatsDailymovement>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToView("v_stats_dailymovements");
+
+            entity.Property(e => e.Barcode).HasMaxLength(255);
+            entity.Property(e => e.CategoryId)
+                .HasDefaultValueSql("'0'")
+                .HasColumnType("int(11)");
+            entity.Property(e => e.CategoryName).HasMaxLength(255);
+            entity.Property(e => e.MovementDate)
+                .HasDefaultValueSql("current_timestamp()")
+                .HasColumnType("datetime");
+            entity.Property(e => e.MovementType).HasMaxLength(255);
+            entity.Property(e => e.MovementTypeId)
+                .HasColumnType("int(11)")
+                .HasColumnName("movement_type_id");
+            entity.Property(e => e.ProductName).HasMaxLength(255);
+            entity.Property(e => e.TotalQuantity).HasPrecision(32);
         });
 
         modelBuilder.Entity<VStockPerGroup>(entity =>
