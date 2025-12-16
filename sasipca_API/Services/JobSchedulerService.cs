@@ -99,17 +99,28 @@ namespace sasipca_API.Services
 
             var notificationDate = expiryDate.AddDays(-daysBefore).ToDateTime(new TimeOnly(8, 30, 0));
 
-            if (notificationDate < DateTime.Now)
+            // 2. Verificar se essa data já passou
+            if (notificationDate <= DateTime.Now)
             {
-                notificationDate = DateTime.Now.AddMinutes(10);
+                // CASO A: Já passou da hora (ex: configuraste 50 dias e já só faltam 30)
+                // Usamos ENQUEUE para executar "já", sem esperar 10 minutos.
+                BackgroundJob.Enqueue<IJobSchedulerService>(
+                    service => service.VerifyProductExpiry(groupId, daysBefore)
+                );
+
+                _logger.LogInformation($"[IMEDIATO] Agendamento imediato para grupo #{groupId} ({productName}). Data ideal ({notificationDate}) já passou.");
             }
+            else
+            {
+                // CASO B: Ainda é no futuro
+                // Usamos SCHEDULE para a data calculada.
+                BackgroundJob.Schedule<IJobSchedulerService>(
+                    service => service.VerifyProductExpiry(groupId, daysBefore),
+                    new DateTimeOffset(notificationDate)
+                );
 
-            BackgroundJob.Schedule<IJobSchedulerService>(
-                service => service.VerifyProductExpiry(groupId, daysBefore),
-                new DateTimeOffset(notificationDate)
-            );
-
-            _logger.LogInformation($"Agendado aviso de validade para grupo #{groupId} ({productName}) em {notificationDate}.");
+                _logger.LogInformation($"Agendado aviso de validade para grupo #{groupId} ({productName}) em {notificationDate}.");
+            }
         }
 
         [AutomaticRetry(Attempts = 3)]

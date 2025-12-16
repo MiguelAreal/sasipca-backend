@@ -84,7 +84,7 @@ namespace sasipca_API.Controllers
                     return NotFound(new Resposta($"Não foram encontrados dados para gerar o relatório '{request.Type}'."));
                 }
 
-                // 2. Retornar o arquivo como File Content
+                // 2. Retornar o ficheiro como File Content
                 // NOTA: O 'newReportId' é retornado no serviço, mas usado aqui apenas
                 // para confirmação interna ou futura auditoria.
                 return File(fileContent, mimeType, finalFileName);
@@ -95,7 +95,6 @@ namespace sasipca_API.Controllers
             }
             catch (Exception ex)
             {
-                // Aqui você pode logar o ex.Message e o StackTrace para diagnosticar
                 return StatusCode(StatusCodes.Status500InternalServerError, new Resposta("Ocorreu um erro interno ao gerar o relatório: " + ex.Message));
             }
         }

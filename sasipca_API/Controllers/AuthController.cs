@@ -105,7 +105,7 @@ namespace sasipca_API.Controllers
                 int internalId;
                 string userName;
                 string refreshToken = GenerateRefreshTokenString();
-                DateTime refreshTokenExp = DateTime.Now.AddMinutes(_refreshTokenValidityMinutes);
+                DateTime refreshTokenExp = DateTime.UtcNow.AddMinutes(_refreshTokenValidityMinutes);
 
                 // A. Verificar ADMIN
                 var adminUser = await _dbcontext.Users.FirstOrDefaultAsync(u => u.Email == email);
@@ -195,22 +195,22 @@ namespace sasipca_API.Controllers
             if (role == UserRole.Admin)
             {
                 var user = await _dbcontext.Users.FindAsync(userId);
-                if (user == null || user.RefreshToken != refreshToken || user.RefreshTokenExp <= DateTime.Now)
+                if (user == null || user.RefreshToken != refreshToken || user.RefreshTokenExp <= DateTime.UtcNow)
                     return Unauthorized(new Resposta("Sessão inválida ou expirada."));
 
                 userName = user.Name;
                 user.RefreshToken = newRefreshToken;
-                user.RefreshTokenExp = DateTime.Now.AddMinutes(_refreshTokenValidityMinutes);
+                user.RefreshTokenExp = DateTime.UtcNow.AddMinutes(_refreshTokenValidityMinutes);
             }
             else if (role == UserRole.Beneficiary)
             {
                 var beneficiary = await _dbcontext.Beneficiaries.FindAsync(userId);
-                if (beneficiary == null || beneficiary.RefreshToken != refreshToken || beneficiary.RefreshTokenExp <= DateTime.Now)
+                if (beneficiary == null || beneficiary.RefreshToken != refreshToken || beneficiary.RefreshTokenExp <= DateTime.UtcNow)
                     return Unauthorized(new Resposta("Sessão inválida ou expirada."));
 
                 userName = beneficiary.Name;
                 beneficiary.RefreshToken = newRefreshToken;
-                beneficiary.RefreshTokenExp = DateTime.Now.AddMinutes(_refreshTokenValidityMinutes);
+                beneficiary.RefreshTokenExp = DateTime.UtcNow.AddMinutes(_refreshTokenValidityMinutes);
             }
             else
             {
@@ -222,7 +222,7 @@ namespace sasipca_API.Controllers
             newAccessToken = _jwtService.GenerateToken(userId, email, role.ToString());
 
             // Atualizar cookie
-            SetRefreshTokenCookie(newRefreshToken, DateTime.Now.AddMinutes(_refreshTokenValidityMinutes));
+            SetRefreshTokenCookie(newRefreshToken, DateTime.UtcNow.AddMinutes(_refreshTokenValidityMinutes));
 
             return Ok(new AuthResponse(newAccessToken, newRefreshToken, userId, userName, role.ToString()));
         }

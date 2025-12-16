@@ -21,51 +21,54 @@ namespace sasipca_API.Controllers
         }
 
         // ---------------------------------------------------------
-        // 1. DASHBOARD SUMMARY (KPIs)
+        // 1. DETAILED DASHBOARD SUMMARY (KPIs)
         // ---------------------------------------------------------
         [HttpGet("summary")]
         [AuthorizeRole(UserRole.Admin)]
-        public async Task<ActionResult<DashboardSummaryDTO>> GetSummary()
+        public async Task<ActionResult<DashboardSummaryDTO>> GetSummary([FromQuery] DateRangeFilterDTO filter)
         {
             var today = DateOnly.FromDateTime(DateTime.Now);
-            var lastMonth = today.AddDays(-30);
 
-            // Total de itens em stock
+            // 1. Stock Total (Geral)
             var totalStock = await _context.ProductGroups.SumAsync(pg => pg.Quantity);
 
-            // Produtos com stock baixo
-            var lowStock = await _context.Products
-                .Select(p => new
-                {
-                    p.ExpNotif,
-                    TotalQuantity = p.ProductGroups.Sum(pg => pg.Quantity)
-                })
-                .Where(x => x.TotalQuantity <= (x.ExpNotif ?? 5))
-                .CountAsync();
-
-            // Entregas Pendentes
+            // 2. Entregas Pendentes (Geral - Mantido)
             var pendingDeliveries = await _context.Deliveries
                 .CountAsync(d => d.StatusId == (int)Enums.DeliveryStatus.Agendada);
 
-            // Beneficiários Ativos
-            var activeBeneficiaries = await _context.Deliveries
-                .Where(d => d.StatusId == (int)Enums.DeliveryStatus.Entregue
-                            && d.ScheduledDate >= lastMonth)
-                .Select(d => d.BeneficiaryId)
-                .Distinct()
-                .CountAsync();
+            // 3. Quantidade de Stock Expirado
+            var expiredStock = await _context.ProductGroups
+                .Where(pg => pg.ExpiryDate < today)
+                .SumAsync(pg => pg.Quantity);
+
+            // 4. Novos Beneficiários no Período
+            var beneficiariesQuery = _context.Beneficiaries.AsQueryable();
+
+            if (filter.DateFrom.HasValue)
+            {
+                var dtFrom = filter.DateFrom.Value.ToDateTime(TimeOnly.MinValue);
+                beneficiariesQuery = beneficiariesQuery.Where(b => b.CreatedAt >= dtFrom);
+            }
+
+            if (filter.DateTo.HasValue)
+            {
+                var dtTo = filter.DateTo.Value.ToDateTime(TimeOnly.MaxValue);
+                beneficiariesQuery = beneficiariesQuery.Where(b => b.CreatedAt <= dtTo);
+            }
+
+            var newBeneficiaries = await beneficiariesQuery.CountAsync();
 
             return Ok(new DashboardSummaryDTO
             {
                 TotalProductsInStock = totalStock,
-                LowStockCount = lowStock,
                 PendingDeliveriesCount = pendingDeliveries,
-                ActiveBeneficiariesCount = activeBeneficiaries
+                ExpiredStockQuantity = expiredStock,
+                NewBeneficiariesCount = newBeneficiaries
             });
         }
 
         // ---------------------------------------------------------
-        // 2. FLUXO DE STOCK (Entradas vs Saídas) - Gráfico de Linhas
+        // 2. FLUXO DE STOCK (Entradas vs Saídas - Gráfico Linhas)
         // ---------------------------------------------------------
         [HttpGet("movements-flow")]
         [AuthorizeRole(UserRole.Admin)]
@@ -73,7 +76,6 @@ namespace sasipca_API.Controllers
         {
             var query = _context.VStatsDailymovements.AsQueryable();
 
-            // CORREÇÃO: Converter DateOnly para DateTime para comparação com a base de dados
             if (filter.DateFrom.HasValue)
             {
                 var dtFrom = filter.DateFrom.Value.ToDateTime(TimeOnly.MinValue);
@@ -86,33 +88,29 @@ namespace sasipca_API.Controllers
                 query = query.Where(v => v.MovementDate <= dtTo);
             }
 
-            // Agrupar por Data e Tipo
-            // Nota: Para evitar erro de tradução LINQ, fazemos a projeção final em memória (ToList) se necessário,
-            // mas aqui o GroupBy simples deve funcionar se a View já tiver MovementDate como DateTime.
             var rawData = await query
                 .GroupBy(v => new { v.MovementDate, v.MovementType })
                 .Select(g => new
                 {
                     g.Key.MovementDate,
                     g.Key.MovementType,
-                    Total = g.Sum(x => x.TotalQuantity) // Sum retorna int/long/decimal?
+                    Total = g.Sum(x => x.TotalQuantity)
                 })
                 .OrderBy(x => x.MovementDate)
                 .ToListAsync();
 
-            // Mapeamento para DTO final (Cast seguro para double)
             var result = rawData.Select(x => new ChartDataPoint
             {
-                Label = x.MovementDate.ToString("yyyy-MM-dd"), // Formatamos a data aqui
+                Label = x.MovementDate.ToString("yyyy-MM-dd"),
                 Series = x.MovementType,
-                Value = (double)(x.Total ?? 0) // Cast explícito e tratamento de nulo
+                Value = (double)(x.Total ?? 0)
             }).ToList();
 
             return Ok(result);
         }
 
         // ---------------------------------------------------------
-        // 3. TOP PRODUTOS MAIS ENTREGUES - Gráfico de Barras/Pie
+        // 3. TOP PRODUTOS (SAÍDAS) - Gráfico Barras
         // ---------------------------------------------------------
         [HttpGet("top-products")]
         [AuthorizeRole(UserRole.Admin)]
@@ -147,7 +145,7 @@ namespace sasipca_API.Controllers
             var result = rawData.Select(x => new ChartDataPoint
             {
                 Label = x.ProductName ?? "Desconhecido",
-                Value = (double)(x.Total ?? 0), // Cast explícito
+                Value = (double)(x.Total ?? 0),
                 Series = "Total Saída"
             }).ToList();
 
@@ -155,14 +153,17 @@ namespace sasipca_API.Controllers
         }
 
         // ---------------------------------------------------------
-        // 4. ENTREGAS POR CATEGORIA - Gráfico de Donut
+        // 4. DISTRIBUIÇÃO POR CATEGORIA (CONSOLIDADO) - Donut Chart
         // ---------------------------------------------------------
+        // movementTypeId: 1 = Entrada, 2 = Saída
         [HttpGet("categories-distribution")]
         [AuthorizeRole(UserRole.Admin)]
-        public async Task<ActionResult<List<ChartDataPoint>>> GetCategoriesDistribution([FromQuery] DateRangeFilterDTO filter)
+        public async Task<ActionResult<List<ChartDataPoint>>> GetCategoriesDistribution(
+            [FromQuery] DateRangeFilterDTO filter,
+            [FromQuery] int movementTypeId)
         {
             var query = _context.VStatsDailymovements
-                .Where(v => v.MovementTypeId == (int)Enums.MovementTypes.Saida);
+                .Where(v => v.MovementTypeId == movementTypeId);
 
             if (filter.DateFrom.HasValue)
             {
@@ -189,14 +190,14 @@ namespace sasipca_API.Controllers
             var result = rawData.Select(x => new ChartDataPoint
             {
                 Label = x.CategoryName ?? "Sem Categoria",
-                Value = (double)(x.Total ?? 0) // Cast explícito
+                Value = (double)(x.Total ?? 0)
             }).ToList();
 
             return Ok(result);
         }
 
         // ---------------------------------------------------------
-        // 5. RESUMO MENSAL (PARA A HOMEPAGE)
+        // 5. RESUMO MENSAL (PARA A HOMEPAGE) - RESTAURADO
         // ---------------------------------------------------------
         [HttpGet("monthly-summary")]
         [AuthorizeRole(UserRole.Admin)]
@@ -213,15 +214,12 @@ namespace sasipca_API.Controllers
                                  && d.ScheduledDate <= endDate);
 
             // 2. Entregas Realizadas (Entregues neste mês)
-            // Nota: Usamos ScheduledDate como data de entrega efetiva ou devíamos ter um DeliveredDate? 
-            // Assumindo ScheduledDate para simplificar a query na View atual.
             var realized = await _context.Deliveries
                 .CountAsync(d => d.StatusId == (int)Enums.DeliveryStatus.Entregue
                                  && d.ScheduledDate >= startDate
                                  && d.ScheduledDate <= endDate);
 
-            // 3. Doações Feitas (Entradas de Stock / Receipts neste mês)
-            // "Doações Feitas" geralmente refere-se ao que a instituição recebeu (Entradas).
+            // 3. Doações/Receções (Entradas de Stock neste mês)
             var donationsReceived = await _context.Movements
                 .CountAsync(m => m.MovementTypeId == (int)Enums.MovementTypes.Entrada
                                  && DateOnly.FromDateTime(m.CreatedAt) >= startDate
@@ -244,19 +242,17 @@ namespace sasipca_API.Controllers
         [AllowAnonymous]
         public async Task<ActionResult<List<ChartDataPoint>>> GetStockByCategory()
         {
-            // Usamos a tabela Products e ProductGroups para calcular o stock real atual
             var data = await _context.Products
                 .Include(p => p.Category)
                 .Include(p => p.ProductGroups)
-                .GroupBy(p => p.Category.Type) // Agrupa pelo nome da categoria
+                .GroupBy(p => p.Category.Type)
                 .Select(g => new ChartDataPoint
                 {
                     Label = g.Key ?? "Sem Categoria",
-                    // Soma a quantidade de todos os grupos de todos os produtos dessa categoria
                     Value = g.Sum(p => p.ProductGroups.Sum(pg => pg.Quantity)),
                     Series = "Stock Atual"
                 })
-                .Where(x => x.Value > 0) // Opcional: Mostra apenas categorias com stock
+                .Where(x => x.Value > 0)
                 .OrderByDescending(x => x.Value)
                 .ToListAsync();
 

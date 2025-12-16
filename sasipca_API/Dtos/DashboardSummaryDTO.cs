@@ -3,8 +3,8 @@
     public class DashboardSummaryDTO
     {
         public int TotalProductsInStock { get; set; }
-        public int LowStockCount { get; set; } // Produtos abaixo do nível de aviso
-        public int PendingDeliveriesCount { get; set; } // Agendadas
-        public int ActiveBeneficiariesCount { get; set; } // Últimos 30 dias
+        public int PendingDeliveriesCount { get; set; } // Mantido a pedido
+        public int ExpiredStockQuantity { get; set; }   // Stock Expirado
+        public int NewBeneficiariesCount { get; set; }  // Novos registos no período
     }
 }
