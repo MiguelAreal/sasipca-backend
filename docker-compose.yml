@@ -1,0 +1,43 @@
+version: '3.8'
+
+networks:
+  web_network:
+    external: true
+  internal_db_net:
+    driver: bridge
+
+services:
+  # --- Database ---
+  sasipca-db:
+    image: mariadb:latest
+    container_name: sasipca-db
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD} # Variable from Portainer
+      MARIADB_DATABASE: sasipca
+    volumes:
+      - /home/areal/docker/sasipca/db_data:/var/lib/mysql
+    networks:
+      - internal_db_net
+
+  # --- API ---
+  sasipca-api:
+    build: .  # Builds from the repo root
+    container_name: sasipca-api
+    restart: unless-stopped
+    depends_on:
+      - sasipca-db
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:5000
+      # Inject the connection key safely from Portainer UI
+      - ConnectionStrings__DefaultConnection=${DB_CONNECTION_KEY}
+      - JWT_KEY=${JWT_KEY}
+      - AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
+    volumes:
+      # Mapped to server for storage persistence
+      - /home/areal/www/sasipca-api/Reports:/app/Reports
+      - /home/areal/www/sasipca-api/Storage/CampaignImages:/app/Storage/CampaignImages
+    networks:
+      - web_network
+      - internal_db_net
