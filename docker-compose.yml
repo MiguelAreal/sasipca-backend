@@ -19,6 +19,8 @@ services:
       - /home/areal/docker/sasipca/db_data:/var/lib/mysql
     networks:
       - internal_db_net
+    ports:
+      - "3306:3306"
 
   # --- API ---
   sasipca-api:
