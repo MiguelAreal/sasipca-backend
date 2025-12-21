@@ -48,7 +48,6 @@ namespace sasipca_API.Controllers
         }
 
 
-
         /// <summary>
         /// Busca dados de todos os produtos existentes com quantidades reais (View) consoante filtros.
         /// </summary>
@@ -59,7 +58,7 @@ namespace sasipca_API.Controllers
         /// <param name="searchTerm">Termo para busca por nome</param>
         /// <returns>Lista paginada de produtos</returns>
         [HttpGet()]
-        [AuthorizeRole(UserRole.Admin,UserRole.Beneficiary)]
+        [AllowAnonymous]
         public async Task<ActionResult<PaginatedResponse<ProductListDTO>>> GetAllProducts(
          [FromQuery] int pageNumber = 1,
          [FromQuery] int pageSize = 10,

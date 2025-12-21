@@ -7,10 +7,10 @@ namespace sasipca_API.Services.Interfaces
     public interface IReportingService
     {
         /// <summary>
-        /// Gera o relatório com base nos parâmetros e retorna o conteúdo do arquivo.
+        /// Gera o relatório com base nos parâmetros e retorna o conteúdo do ficheiro.
         /// </summary>
         /// <param name="request">A solicitação de relatório.</param>
-        /// <returns>O conteúdo binário do arquivo e o tipo de mídia (MimeType).</returns>
+        /// <returns>O conteúdo binário do ficheiro e o tipo de mídia (MimeType).</returns>
         Task<(byte[] fileContent, string mimeType, string fileName, int newReportId)> GenerateReportAsync(ReportRequestDTO request, int creatorId);
 
         /// <summary>
@@ -23,7 +23,7 @@ namespace sasipca_API.Services.Interfaces
         /// Busca o conteúdo do ficheiro de relatório guardado no disco.
         /// </summary>
         /// <param name="reportId">O ID do registo do relatório na base de dados.</param>
-        /// <returns>O conteúdo binário do arquivo, tipo MIME e nome do arquivo.</returns>
+        /// <returns>O conteúdo binário do ficheiro, tipo MIME e nome do ficheiro.</returns>
         Task<(byte[] fileContent, string mimeType, string fileName)> GetReportFileAsync(int reportId);
     }
 }

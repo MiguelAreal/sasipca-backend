@@ -123,6 +123,7 @@ namespace sasipca_API.Services
                     IssuerSigningKey = new SymmetricSecurityKey(key),
                     ValidateIssuer = false,
                     ValidateAudience = false,
+                    ValidateLifetime =false,
                     ClockSkew = TimeSpan.Zero
                 }, out _);
 

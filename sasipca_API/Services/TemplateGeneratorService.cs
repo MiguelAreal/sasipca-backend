@@ -1,5 +1,7 @@
-﻿using sasipca_API.DBModels;
+﻿using Microsoft.EntityFrameworkCore;
+using sasipca_API.DBModels;
 using sasipca_API.Dtos;
+using sasipca_API.Models; // Certifica-te que o teu SasipcaContext está aqui ou ajusta o namespace
 using sasipca_API.Services.Interfaces;
 using System;
 using System.Collections.Generic;
@@ -13,14 +15,21 @@ namespace sasipca_API.Services
     public class TemplateGeneratorService : ITemplateGeneratorService
     {
         private readonly string _basePath;
+        private readonly SasipcaContext _context; // 1. Contexto da BD
+        private Dictionary<int, string>? _movementTypesCache; // 2. Cache em memória
 
-        public TemplateGeneratorService()
+        // Atualizar construtor para receber o Contexto
+        public TemplateGeneratorService(SasipcaContext context)
         {
+            _context = context;
             _basePath = Path.Combine(Directory.GetCurrentDirectory(), "ReportTemplates");
         }
 
         public string GenerateReportHtml<T>(T data, ReportTypesEnum type, ReportRequestDTO request, string reportTypeName)
         {
+            // Limpar cache antiga para garantir dados frescos a cada pedido
+            _movementTypesCache = null;
+
             // 1. Carregar Template Base e CSS
             const string templateFileName = "ReportTemplate.html";
             var templatePath = Path.Combine(_basePath, templateFileName);
@@ -32,7 +41,6 @@ namespace sasipca_API.Services
 
             // --- 2. Gerar Conteúdo Condicional ---
             string dynamicContent = GenerateDynamicReportBody(data, type, filters);
-
 
             // Substituições de metadados
             htmlTemplate = htmlTemplate.Replace("{report_title}", $"Relatório de {reportTypeName}");
@@ -62,11 +70,16 @@ namespace sasipca_API.Services
             }
 
             // Lógica de detalhes específicos (MovementDetails - Cabeçalho do movimento)
-            if (type == ReportTypesEnum.MovementDetails && data is List<VMovHistoryDetail> details && details.Any()) // <<-- CORRIGIDO
+            if (type == ReportTypesEnum.MovementDetails && data is List<VMovHistoryDetail> details && details.Any())
             {
                 var header = details.First();
+
+                // [ALTERAÇÃO] Obter nome do tipo
+                string typeName = GetMovementTypeName(header.MovementTypeId);
+
                 sb.AppendLine("<h4>Detalhes do Movimento:</h4>");
-                sb.AppendLine($"<p>Tipo: <strong>{header.MovementTypeId}</strong> | Data: <strong>{header.MovementDate:yyyy-MM-dd HH:mm}</strong></p>");
+                // Substituído ID por Nome
+                sb.AppendLine($"<p>Tipo: <strong>{typeName}</strong> | Data: <strong>{header.MovementDate:yyyy-MM-dd HH:mm}</strong></p>");
                 sb.AppendLine($"<p>Utilizador: <strong>{header.UserName}</strong> | Nota: <strong>{header.MovementNote ?? "N/A"}</strong></p>");
 
                 if (header.DeliveryId.HasValue)
@@ -88,7 +101,10 @@ namespace sasipca_API.Services
                 sb.AppendLine("</thead><tbody>");
                 foreach (var h in history)
                 {
-                    sb.AppendLine($"<tr><td>{h.MovementDate:yyyy-MM-dd HH:mm}</td><td>{h.MovementTypeId}</td><td>{h.UserName}</td><td>{h.MovementNote ?? "-"}</td><td class='align-right'>{h.TotalQuantityAffected}</td></tr>");
+                    // [ALTERAÇÃO] Obter nome do tipo para cada linha
+                    string rowTypeName = GetMovementTypeName(h.MovementTypeId);
+
+                    sb.AppendLine($"<tr><td>{h.MovementDate:yyyy-MM-dd HH:mm}</td><td>{rowTypeName}</td><td>{h.UserName}</td><td>{h.MovementNote ?? "-"}</td><td class='align-right'>{h.TotalQuantityAffected}</td></tr>");
                 }
             }
             else if (type == ReportTypesEnum.DeliveryHeaders && data is List<VDelivery> deliveries)
@@ -97,6 +113,7 @@ namespace sasipca_API.Services
                 sb.AppendLine("</thead><tbody>");
                 foreach (var d in deliveries)
                 {
+                    // Nota: Se quiseres fazer o mesmo para StatusId, precisas de lógica similar
                     sb.AppendLine($"<tr><td>{d.ScheduledDate:yyyy-MM-dd}</td><td>{d.StatusId}</td><td>{d.BeneficiaryName}</td><td>{d.UserName}</td><td>{d.Note ?? "-"}</td></tr>");
                 }
             }
@@ -113,6 +130,28 @@ namespace sasipca_API.Services
             sb.AppendLine("</tbody></table>");
 
             return sb.ToString();
+        }
+
+        // --- MÉTODO AUXILIAR PARA IR À BD (VIA CACHE) ---
+        private string GetMovementTypeName(int typeId)
+        {
+            // Se a cache estiver vazia, vai à BD buscar TUDO de uma vez
+            if (_movementTypesCache == null)
+            {
+                try
+                {
+                    // Assume que a tabela se chama 'MovementTypes' no teu Contexto
+                    _movementTypesCache = _context.MovementTypes.ToDictionary(k => k.Id, v => v.Type);
+                }
+                catch
+                {
+                    // Fallback se houver erro de ligação (evita crash do report)
+                    _movementTypesCache = new Dictionary<int, string>();
+                }
+            }
+
+            // Tenta obter o nome. Se não existir o ID, devolve o número como string
+            return _movementTypesCache.ContainsKey(typeId) ? _movementTypesCache[typeId] : typeId.ToString();
         }
     }
 }
