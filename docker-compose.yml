@@ -32,8 +32,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:5000
-      # Inject the connection key safely from Portainer UI
-      - ConnectionStrings__DefaultConnection=${DB_CONNECTION_KEY}
+      - DB_CONNECTION_KEY=${DB_CONNECTION_KEY}
       - JWT_KEY=${JWT_KEY}
       - AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
     volumes:
