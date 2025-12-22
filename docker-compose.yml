@@ -36,9 +36,8 @@ services:
       - JWT_KEY=${JWT_KEY}
       - AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
     volumes:
-      # Mapped to server for storage persistence
-      - /home/areal/www/sasipca-api/Reports:/app/Reports
-      - /home/areal/www/sasipca-api/Storage/CampaignImages:/app/Storage/CampaignImages
+      # Storage persistence
+      - /home/areal/docker/sasipca/storage:/app/Storage
     networks:
       - web_network
       - internal_db_net

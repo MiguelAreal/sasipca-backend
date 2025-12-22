@@ -87,7 +87,7 @@ namespace sasipca_API.Services
             }
 
             // 3. Guardar no Disco
-            var reportsDirectory = Path.Combine(Directory.GetCurrentDirectory(), "Reports");
+            var reportsDirectory = Path.Combine(Directory.GetCurrentDirectory(),"Storage", "Reports");
             if (!Directory.Exists(reportsDirectory))
             {
                 Directory.CreateDirectory(reportsDirectory);
@@ -147,7 +147,7 @@ namespace sasipca_API.Services
             }
 
             var fileName = reportEntry.Name;
-            var reportsDirectory = Path.Combine(Directory.GetCurrentDirectory(), "Reports");
+            var reportsDirectory = Path.Combine(Directory.GetCurrentDirectory(),"Storage", "Reports");
             var filePath = Path.Combine(reportsDirectory, fileName);
 
             var mimeType = fileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ? "application/pdf" : "text/csv";
