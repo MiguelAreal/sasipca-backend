@@ -336,12 +336,12 @@ namespace sasipca_API
                     c.ConfigObject.AdditionalItems["requestCredentials"] = "inclsude";
                 });
                 app.UseHangfireDashboard();
-            }            
+            }
 
             // Definir a pasta raíz de ficheiros de imagens para campanhas
             // Desta forma podemos ter /Reports sem acesso
-            const string StorageRootFolder = "Storage";
-            var campaignImagesPath = Path.Combine(StorageRootFolder, "CampaignImages");
+            var contentRoot = app.Environment.ContentRootPath;
+            var campaignImagesPath = Path.Combine(contentRoot, "Storage", "CampaignImages");
             if (!Directory.Exists(campaignImagesPath))
             {
                 Directory.CreateDirectory(campaignImagesPath);
