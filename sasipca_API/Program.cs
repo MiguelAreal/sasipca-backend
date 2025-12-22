@@ -322,6 +322,14 @@ namespace sasipca_API
                 ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
             });
 
+            // --- DEBUG: Escreve no log todos os pedidos que chegam ---
+            app.Use(async (context, next) =>
+            {
+                Console.WriteLine($"[DEBUG] Recebi pedido: {context.Request.Path}");
+                await next();
+            });
+            // ---------------------------------------------------------
+
 
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
