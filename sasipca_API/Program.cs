@@ -14,10 +14,8 @@ using Microsoft.OpenApi.Models;
 using sasipca_API.DBModels;
 using sasipca_API.Hubs;
 using sasipca_API.Middleware;
-using sasipca_API.Models;
 using sasipca_API.Services;
 using sasipca_API.Services.Interfaces;
-using Serilog;
 using Serilog;
 using System.Globalization;
 using System.Reflection;
@@ -215,9 +213,10 @@ namespace sasipca_API
                 {
                     policy.SetIsOriginAllowed(origin =>
                     {
-                        if (string.IsNullOrWhiteSpace(origin)) return false;
-                        if (origin.Contains("localhost")) return true;
-                        if (origin.EndsWith("rapi.tail1fcae6.ts.net")) return true;
+                    if (string.IsNullOrWhiteSpace(origin)) return false;
+                    if (origin.Contains("localhost")) return true;
+                    if (origin.EndsWith("rapi.tail1fcae6.ts.net")) return true;
+                    if (origin.EndsWith("rapi4real.duckdns.org"))return true;
                         return false;
                     })
                     .AllowAnyHeader()
@@ -339,24 +338,18 @@ namespace sasipca_API
                 app.UseHangfireDashboard();
             }            
 
-            // Definir a pasta raíz de uploads
+            // Definir a pasta raíz de ficheiros de imagens para campanhas
+            // Desta forma podemos ter /Reports sem acesso
             const string StorageRootFolder = "Storage";
-
-            // Verifica e cria a pasta 'Storage' se não existir
-            string storagePath = Path.Combine(app.Environment.ContentRootPath, StorageRootFolder);
-
-            if (!Directory.Exists(storagePath))
+            var campaignImagesPath = Path.Combine(StorageRootFolder, "CampaignImages");
+            if (!Directory.Exists(campaignImagesPath))
             {
-                // A lógica para criar o diretorio no sistema de ficheiros
-                Directory.CreateDirectory(storagePath);
+                Directory.CreateDirectory(campaignImagesPath);
             }
-
-            // Mapear a pasta "Storage" para a URL "/static"
             app.UseStaticFiles(new StaticFileOptions
             {
-                // O RequestPath define o prefixo URL que o cliente usará (ex: https://api.exemplo.com/static/CampaignImages/imagem.jpg)
-                FileProvider = new PhysicalFileProvider(storagePath),
-                RequestPath = "/api/static"
+                FileProvider = new PhysicalFileProvider(campaignImagesPath),
+                RequestPath = "/api/static/CampaignImages"
             });
 
 
