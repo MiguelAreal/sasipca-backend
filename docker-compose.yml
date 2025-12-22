@@ -12,6 +12,9 @@ services:
     image: mariadb:latest
     container_name: sasipca-db
     restart: unless-stopped
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     environment:
       MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD} # Variable from Portainer
       MARIADB_DATABASE: sasipca
