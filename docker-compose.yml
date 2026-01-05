@@ -16,7 +16,7 @@ services:
       - 8.8.8.8
       - 1.1.1.1
     environment:
-      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD} # Variable from Portainer
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       MARIADB_DATABASE: sasipca
     volumes:
       - /home/areal/docker/sasipca/db_data:/var/lib/mysql
@@ -24,14 +24,20 @@ services:
       - internal_db_net
     ports:
       - "3306:3306"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # --- API ---
   sasipca-api:
-    build: .  # Builds from the repo root
+    build: .
     container_name: sasipca-api
     restart: unless-stopped
     depends_on:
-      - sasipca-db
+      sasipca-db:
+        condition: service_healthy
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:5000
@@ -39,9 +45,7 @@ services:
       - JWT_KEY=${JWT_KEY}
       - AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
     volumes:
-      # Storage persistence
       - /home/areal/docker/sasipca/storage:/app/Storage
-      # Firebase
       - ${FIREBASE_JSON_LOCAL_PATH}:/app/sasipca-2ea18-firebase-adminsdk-fbsvc-5d72cf6e66.json
     networks:
       - web_network

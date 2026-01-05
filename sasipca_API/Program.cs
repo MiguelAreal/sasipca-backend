@@ -105,7 +105,16 @@ namespace sasipca_API
 
             // Regista o DBContext para usar a string de Conexão
             builder.Services.AddDbContext<SasipcaContext>(options =>
-            options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+             options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString),
+                 mySqlOptions =>
+                 {
+                     // Ativa a estratégia de execução para falhas transitórias
+                     mySqlOptions.EnableRetryOnFailure(
+                         maxRetryCount: 10,           // Tenta 10 vezes
+                         maxRetryDelay: TimeSpan.FromSeconds(30), // Espera até 30s entre tentativas
+                         errorNumbersToAdd: null);    // Erros SQL default já incluídos
+                 }
+             ));
 
             //Regista o serviço HangFire.
             builder.Services.AddHangfire(configuration => configuration
