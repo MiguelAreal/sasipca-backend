@@ -16,13 +16,14 @@ namespace sasipca_API.Services
     {
         private readonly string _basePath;
         private readonly SasipcaContext _context; // 1. Contexto da BD
+        private readonly IWebHostEnvironment _env;
         private Dictionary<int, string>? _movementTypesCache; // 2. Cache em memória
 
         // Atualizar construtor para receber o Contexto
         public TemplateGeneratorService(SasipcaContext context)
         {
             _context = context;
-            _basePath = Path.Combine(Directory.GetCurrentDirectory(), "ReportTemplates");
+            _basePath = Path.Combine(_env.ContentRootPath, "ReportTemplates");
         }
 
         public string GenerateReportHtml<T>(T data, ReportTypesEnum type, ReportRequestDTO request, string reportTypeName)

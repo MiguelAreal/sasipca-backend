@@ -12,9 +12,14 @@
   <ItemGroup>
     <Compile Remove="Middleware\JwtBlacklistMiddleware.cs" />
   </ItemGroup>
-
+	
   <ItemGroup>
-    <None Remove="ReportTemplates\ReportTemplate.html" />
+	  <Content Include="ReportTemplates\**">
+	   <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </Content>
+  </ItemGroup>
+	
+  <ItemGroup>
 	<PackageReference Include="Azure.Storage.Blobs" Version="12.26.0" />
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
     <PackageReference Include="DotNetEnv" Version="3.1.1" />
@@ -52,6 +57,10 @@
     <PackageReference Include="System.Net.WebSockets" Version="4.3.0" />
     <PackageReference Include="WkHtmlToXSharp" Version="1.2.36" />
     <PackageReference Include="xunit" Version="2.9.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Reports\" />
   </ItemGroup>
 
 </Project>
