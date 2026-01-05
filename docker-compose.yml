@@ -41,6 +41,8 @@ services:
     volumes:
       # Storage persistence
       - /home/areal/docker/sasipca/storage:/app/Storage
+      # Firebase
+      - ${FIREBASE_JSON_LOCAL_PATH}:/app/sasipca-2ea18-firebase-adminsdk-fbsvc-5d72cf6e66.json
     networks:
       - web_network
       - internal_db_net
