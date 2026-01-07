@@ -95,9 +95,13 @@ namespace sasipca_API.Controllers
             if (string.IsNullOrEmpty(createDto.Email) || !createDto.Email.EndsWith("ipca.pt"))
                 return BadRequest(new Resposta("O email deve ser válido e do domínio ipca.pt."));
 
-            // Validar se já existe
+            // Validar se já existe email
             if (await _context.Users.AnyAsync(u => u.Email == createDto.Email))
                 return BadRequest(new Resposta("Já existe um administrador com este email."));
+
+            // Validar se já existe contacto
+            if (await _context.Users.AnyAsync(u => u.Contact == createDto.Contact))
+                return BadRequest(new Resposta("Já existe um administrador com este contacto."));
 
             try
             {
