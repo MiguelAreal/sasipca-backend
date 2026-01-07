@@ -2,16 +2,16 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-# 1. Copy just the project file first (for better caching)
+# 1. Copiar apenas o ficheiro de projeto para cache eficiente
 COPY ["sasipca_API/sasipca_API.csproj", "sasipca_API/"]
 
-# 2. Restore dependencies (NuGet packages)
+# 2. Restaurar pacotes NuGet
 RUN dotnet restore "sasipca_API/sasipca_API.csproj"
 
-# 3. Copy the rest of the source code
+# 3. Copiar o resto do código fonte
 COPY . .
 
-# 4. Build and Publish the app to a folder named /app/publish
+# 4. Publicar a aplicação
 WORKDIR "/src/sasipca_API"
 RUN dotnet publish "sasipca_API.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
@@ -19,29 +19,31 @@ RUN dotnet publish "sasipca_API.csproj" -c Release -o /app/publish /p:UseAppHost
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 
-# Instalar dependências necessárias para o motor PDF
-RUN apt-get update && apt-get install -y \
-    libgdiplus \
-    libx11-6 \
-    libxcb1 \
-    libxext6 \
-    libxrender1 \
-    libfontconfig1 \
-    libx11-xcb1 \
-    libice6 \
-    libsm6 \
-    libuuid1 \
-    libpng16-16 \
-    libjpeg62-turbo \
-    xfonts-75dpi \
-    xfonts-base \
+# --- NOVO: Instalação de dependências do Chromium para o Puppeteer ---
+# Mudar para root para instalar pacotes
+USER root
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libnss3 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    libpangocairo-1.0-0 \
+    libgtk-3-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the compiled files from Stage 1
+# Copiar os ficheiros publicados da Stage 1
 COPY --from=build /app/publish .
 
-# GARANTIR que o ficheiro .so tem permissões de execução
-RUN chmod +x libwkhtmltox.so
+# Criar pastas para armazenamento de relatórios e garantir permissões
+RUN mkdir -p Storage/Reports && chmod -R 777 Storage/Reports
 
-# 5. Starts the API
+# Inicia a API
 ENTRYPOINT ["dotnet", "sasipca_API.dll"]

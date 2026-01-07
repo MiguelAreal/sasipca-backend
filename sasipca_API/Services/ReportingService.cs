@@ -1,19 +1,13 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
+using PuppeteerSharp;
 using sasipca_API.DBModels;
 using sasipca_API.Dtos;
-using sasipca_API.Models;
 using sasipca_API.Services.Interfaces;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
+using PuppeteerSharp.Media;
+using WkHtmlToPdfDotNet.Contracts;
 using static sasipca_API.Dtos.ReportRequestDTO;
 using static sasipca_API.Enumerators.Enums;
-using WkHtmlToPdfDotNet.Contracts;
-using WkHtmlToPdfDotNet;
-using System.IO;
 
 namespace sasipca_API.Services
 {
@@ -24,13 +18,12 @@ namespace sasipca_API.Services
     {
         private readonly SasipcaContext _dbContext;
         private readonly ITemplateGeneratorService _templateGeneratorService;
-        private readonly IConverter _pdfConverter;
 
-        public ReportingService(SasipcaContext dbContext, ITemplateGeneratorService templateGeneratorService, IConverter pdfConverter)
+        // Removemos o IConverter (WkHtmlToPdf) para usar apenas Puppeteer
+        public ReportingService(SasipcaContext dbContext, ITemplateGeneratorService templateGeneratorService)
         {
             _dbContext = dbContext;
             _templateGeneratorService = templateGeneratorService;
-            _pdfConverter = pdfConverter;
         }
 
         // --------------------------------------------------------------------
@@ -38,7 +31,7 @@ namespace sasipca_API.Services
         // --------------------------------------------------------------------
         public async Task<(byte[] fileContent, string mimeType, string fileName, int newReportId)> GenerateReportAsync(ReportRequestDTO request, int creatorId)
         {
-            // 1. Obter Nome do Tipo de Relatório para o título
+            // 1. Obter Nome do Tipo de Relatório
             string reportTypeName;
             try
             {
@@ -53,8 +46,7 @@ namespace sasipca_API.Services
                 reportTypeName = request.Type.ToString();
             }
 
-            // 2. [NOVO] Carregar cache de Tipos de Movimento (ID -> Nome)
-            // Isto evita ir à base de dados linha a linha durante a geração do CSV
+            // 2. Cache de Tipos de Movimento
             var movementTypesMap = await _dbContext.MovementTypes
                 .ToDictionaryAsync(k => k.Id, v => v.Type);
 
@@ -74,20 +66,18 @@ namespace sasipca_API.Services
 
             if (request.Format == ReportFormat.CSV)
             {
-                // Passamos o mapa de tipos para o gerador de CSV
                 fileContent = GenerateCsvContent(data, (ReportTypesEnum)request.Type, movementTypesMap);
                 mimeType = "text/csv";
             }
-            else // PDF
+            else
             {
-                // O TemplateGeneratorService (se atualizado conforme passos anteriores) trata disto,
-                // mas a lógica principal de dados é passada aqui.
-                fileContent = GeneratePdfContent(data, (ReportTypesEnum)request.Type, request, reportTypeName);
+                // PDF via Puppeteer (Async)
+                fileContent = await GeneratePdfContentAsync(data, (ReportTypesEnum)request.Type, request, reportTypeName);
                 mimeType = "application/pdf";
             }
 
             // 3. Guardar no Disco
-            var reportsDirectory = Path.Combine(Directory.GetCurrentDirectory(),"Storage", "Reports");
+            var reportsDirectory = Path.Combine(Directory.GetCurrentDirectory(), "Storage", "Reports");
             if (!Directory.Exists(reportsDirectory))
             {
                 Directory.CreateDirectory(reportsDirectory);
@@ -95,7 +85,7 @@ namespace sasipca_API.Services
             var filePath = Path.Combine(reportsDirectory, finalFileName);
             await File.WriteAllBytesAsync(filePath, fileContent);
 
-            // 4. Guardar na Base de Dados
+            // 4. Guardar na BD
             var reportEntry = new Report
             {
                 Name = finalFileName,
@@ -268,34 +258,40 @@ namespace sasipca_API.Services
         // --------------------------------------------------------------------
         // GERAÇÃO DE PDF
         // --------------------------------------------------------------------
-        private byte[] GeneratePdfContent(object data, ReportTypesEnum type, ReportRequestDTO request, string reportTypeName)
+        private async Task<byte[]> GeneratePdfContentAsync(object data, ReportTypesEnum type, ReportRequestDTO request, string reportTypeName)
         {
-            // O serviço de template já trata da conversão ID -> Nome internamente (conforme configurado anteriormente)
             var htmlContent = _templateGeneratorService.GenerateReportHtml((dynamic)data, type, request, reportTypeName);
 
-            var globalSettings = new GlobalSettings
-            {
-                ColorMode = ColorMode.Color,
-                Orientation = Orientation.Portrait,
-                PaperSize = PaperKind.A4,
-                DocumentTitle = request.FileName,
-                Margins = new MarginSettings { Top = 10, Bottom = 10 }
-            };
+            // 1. Garantir que o browser está disponível
+            BrowserFetcher browserFetcher = new BrowserFetcher();
 
-            var objectSettings = new ObjectSettings
-            {
-                HtmlContent = htmlContent,
-                WebSettings = { DefaultEncoding = "utf-8", LoadImages = true },
-                HeaderSettings = { FontSize = 10, Right = "Página [page] de [toPage]", Line = true },
-            };
+            await browserFetcher.DownloadAsync();
 
-            var pdfDoc = new HtmlToPdfDocument
+            // 2. Lançar o browser
+            await using var browser = await Puppeteer.LaunchAsync(new LaunchOptions
             {
-                GlobalSettings = globalSettings,
-                Objects = { objectSettings }
-            };
+                Headless = true,
+                Args = new[] { "--no-sandbox", "--disable-setuid-sandbox" } // Essencial para Docker
+            });
 
-            return _pdfConverter.Convert(pdfDoc);
+            await using var page = await browser.NewPageAsync();
+
+            // 3. Definir o conteúdo e esperar que o motor renderize
+            await page.SetContentAsync(htmlContent);
+
+            // 4. Gerar o PDF
+            return await page.PdfDataAsync(new PdfOptions
+            {
+                Format = PaperFormat.A4,
+                PrintBackground = true,
+                MarginOptions = new PuppeteerSharp.Media.MarginOptions
+                {
+                    Top = "10mm",
+                    Bottom = "10mm",
+                    Left = "10mm",
+                    Right = "10mm"
+                }
+            });
         }
     }
 }
