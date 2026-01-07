@@ -33,10 +33,7 @@ services:
 
   # --- API ---
   sasipca-api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: sasipca-api:local
+    build: .
     container_name: sasipca-api
     restart: unless-stopped
     dns:
