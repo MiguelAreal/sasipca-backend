@@ -1,6 +1,4 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using PuppeteerSharp;
-using PuppeteerSharp.Media;
 using sasipca_API.DBModels;
 using sasipca_API.Dtos;
 using sasipca_API.Services.Interfaces;
