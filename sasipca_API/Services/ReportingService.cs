@@ -1,10 +1,11 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using PuppeteerSharp;
+using PuppeteerSharp.Media;
 using sasipca_API.DBModels;
 using sasipca_API.Dtos;
 using sasipca_API.Services.Interfaces;
 using System.Text;
-using PuppeteerSharp.Media;
+using WkHtmlToPdfDotNet;
 using WkHtmlToPdfDotNet.Contracts;
 using static sasipca_API.Dtos.ReportRequestDTO;
 using static sasipca_API.Enumerators.Enums;
@@ -18,12 +19,14 @@ namespace sasipca_API.Services
     {
         private readonly SasipcaContext _dbContext;
         private readonly ITemplateGeneratorService _templateGeneratorService;
+        private readonly IConverter _pdfConverter;
 
-        // Removemos o IConverter (WkHtmlToPdf) para usar apenas Puppeteer
-        public ReportingService(SasipcaContext dbContext, ITemplateGeneratorService templateGeneratorService)
+
+        public ReportingService(SasipcaContext dbContext,ITemplateGeneratorService templateGeneratorService,IConverter pdfConverter)
         {
             _dbContext = dbContext;
             _templateGeneratorService = templateGeneratorService;
+            _pdfConverter = pdfConverter;
         }
 
         // --------------------------------------------------------------------
@@ -258,40 +261,47 @@ namespace sasipca_API.Services
         // --------------------------------------------------------------------
         // GERAÇÃO DE PDF
         // --------------------------------------------------------------------
-        private async Task<byte[]> GeneratePdfContentAsync(object data, ReportTypesEnum type, ReportRequestDTO request, string reportTypeName)
+        private Task<byte[]> GeneratePdfContentAsync(
+    object data,
+    ReportTypesEnum type,
+    ReportRequestDTO request,
+    string reportTypeName)
         {
-            var htmlContent = _templateGeneratorService.GenerateReportHtml((dynamic)data, type, request, reportTypeName);
+            var htmlContent = _templateGeneratorService.GenerateReportHtml(
+                (dynamic)data, type, request, reportTypeName);
 
-            // 1. Garantir que o browser está disponível
-            BrowserFetcher browserFetcher = new BrowserFetcher();
-
-            await browserFetcher.DownloadAsync();
-
-            // 2. Lançar o browser
-            await using var browser = await Puppeteer.LaunchAsync(new LaunchOptions
+            var doc = new HtmlToPdfDocument()
             {
-                Headless = true,
-                Args = new[] { "--no-sandbox", "--disable-setuid-sandbox" } // Essencial para Docker
-            });
-
-            await using var page = await browser.NewPageAsync();
-
-            // 3. Definir o conteúdo e esperar que o motor renderize
-            await page.SetContentAsync(htmlContent);
-
-            // 4. Gerar o PDF
-            return await page.PdfDataAsync(new PdfOptions
+                GlobalSettings =
+        {
+            ColorMode = ColorMode.Color,
+            Orientation = Orientation.Portrait,
+            PaperSize = PaperKind.A4,
+            Margins = new MarginSettings
             {
-                Format = PaperFormat.A4,
-                PrintBackground = true,
-                MarginOptions = new PuppeteerSharp.Media.MarginOptions
+                Top = 10,
+                Bottom = 10,
+                Left = 10,
+                Right = 10
+            }
+        },
+                Objects =
+        {
+            new ObjectSettings
+            {
+                HtmlContent = htmlContent,
+                WebSettings =
                 {
-                    Top = "10mm",
-                    Bottom = "10mm",
-                    Left = "10mm",
-                    Right = "10mm"
+                    DefaultEncoding = "utf-8",
+                    LoadImages = true
                 }
-            });
+            }
         }
+            };
+
+            var pdf = _pdfConverter.Convert(doc);
+            return Task.FromResult(pdf);
+        }
+
     }
 }

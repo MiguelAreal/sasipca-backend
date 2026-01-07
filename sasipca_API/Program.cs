@@ -96,6 +96,8 @@ namespace sasipca_API
             builder.Services.AddScoped<IJWTService, JWTService>();
             builder.Services.AddTransient<IEmailService, EmailService>();
             builder.Services.AddTransient<ITypesService, TypesService>();
+            builder.Services.AddSingleton<IConverter>(new SynchronizedConverter(new PdfTools()));
+
 
             //Adicionar Serviço de WebSocket
             builder.Services.AddWebSockets(options => {
