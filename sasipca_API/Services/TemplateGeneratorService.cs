@@ -20,9 +20,10 @@ namespace sasipca_API.Services
         private Dictionary<int, string>? _movementTypesCache; // 2. Cache em memória
 
         // Atualizar construtor para receber o Contexto
-        public TemplateGeneratorService(SasipcaContext context)
+        public TemplateGeneratorService(SasipcaContext context, IWebHostEnvironment env)
         {
             _context = context;
+            _env = env;
             _basePath = Path.Combine(_env.ContentRootPath, "ReportTemplates");
         }
 
