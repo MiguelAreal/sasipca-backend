@@ -34,8 +34,12 @@ services:
   # --- API ---
   sasipca-api:
     build: .
+    image: sasipca-api:latest
     container_name: sasipca-api
     restart: unless-stopped
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     depends_on:
       sasipca-db:
         condition: service_healthy
