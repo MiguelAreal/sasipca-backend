@@ -2,7 +2,7 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 COPY ["sasipca_API/sasipca_API.csproj", "sasipca_API/"]
-RUN dotnet restore "sasipca_API/sasipca_API.csproj"
+RUN dotnet restore "sasipca_API/sasipca_API.csproj" --verbosity detailed
 COPY . .
 WORKDIR /src/sasipca_API
 RUN dotnet publish -c Release -o /app/publish /p:UseAppHost=false
