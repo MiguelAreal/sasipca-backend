@@ -1,158 +1,256 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using QuestPDF.Fluent;
+using QuestPDF.Helpers;
+using QuestPDF.Infrastructure;
 using sasipca_API.DBModels;
 using sasipca_API.Dtos;
-using sasipca_API.Models; // Certifica-te que o teu SasipcaContext está aqui ou ajusta o namespace
 using sasipca_API.Services.Interfaces;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
 using static sasipca_API.Enumerators.Enums;
 
 namespace sasipca_API.Services
 {
     public class TemplateGeneratorService : ITemplateGeneratorService
     {
-        private readonly string _basePath;
-        private readonly SasipcaContext _context; // 1. Contexto da BD
-        private readonly IWebHostEnvironment _env;
-        private Dictionary<int, string>? _movementTypesCache; // 2. Cache em memória
+        private readonly SasipcaContext _context;
+        private Dictionary<int, string>? _movementTypesCache;
 
-        // Atualizar construtor para receber o Contexto
-        public TemplateGeneratorService(SasipcaContext context, IWebHostEnvironment env)
+        // Cores do template original
+        private static readonly string PrimaryGreen = "#1a5f3c";
+        private static readonly string LightGray = "#f5f5f5";
+        private static readonly string DarkGray = "#333";
+        private static readonly string BorderGray = "#ddd";
+
+        public TemplateGeneratorService(SasipcaContext context)
         {
             _context = context;
-            _env = env;
-            _basePath = Path.Combine(_env.ContentRootPath, "ReportTemplates");
+            // Configuração de licença obrigatória para QuestPDF
+            QuestPDF.Settings.License = LicenseType.Community;
         }
 
-        public string GenerateReportHtml<T>(T data, ReportTypesEnum type, ReportRequestDTO request, string reportTypeName)
+        public byte[] GenerateReportPdf<T>(T data, ReportTypesEnum type, ReportRequestDTO request, string reportTypeName)
         {
-            // Limpar cache antiga para garantir dados frescos a cada pedido
             _movementTypesCache = null;
-
-            // 1. Carregar Template Base e CSS
-            const string templateFileName = "ReportTemplate.html";
-            var templatePath = Path.Combine(_basePath, templateFileName);
-
-            string htmlTemplate = File.ReadAllText(templatePath, Encoding.UTF8);
-
-            // Obter filtros
             var filters = request.Filters as ReportFiltersDTO;
 
-            // --- 2. Gerar Conteúdo Condicional ---
-            string dynamicContent = GenerateDynamicReportBody(data, type, filters);
+            var document = Document.Create(container =>
+            {
+                container.Page(page =>
+                {
+                    page.Size(PageSizes.A4);
+                    page.Margin(30);
+                    page.PageColor(Colors.White);
 
-            // Substituições de metadados
-            htmlTemplate = htmlTemplate.Replace("{report_title}", $"Relatório de {reportTypeName}");
-            htmlTemplate = htmlTemplate.Replace("{generation_date}", DateTime.Now.ToString("dd-MM-yyyy HH:mm"));
+                    // Header
+                    page.Header().Element(c => ComposeHeader(c, reportTypeName));
 
-            // Injeta o corpo gerado
-            return htmlTemplate.Replace("{report_content}", dynamicContent);
+                    // Content
+                    page.Content().Element(c => ComposeContent(c, data, type, filters));
+
+                    // Footer
+                    page.Footer().AlignRight().Text(text =>
+                    {
+                        text.Span("Documento gerado automaticamente. ").FontSize(8).FontColor(Colors.Grey.Medium);
+                        text.Span("Página ").FontSize(8).FontColor(Colors.Grey.Medium);
+                        text.CurrentPageNumber().FontSize(8).FontColor(Colors.Grey.Medium);
+                    });
+                });
+            });
+
+            return document.GeneratePdf();
         }
 
-        private string GenerateDynamicReportBody<T>(T data, ReportTypesEnum type, ReportFiltersDTO? filters)
+        private void ComposeHeader(IContainer container, string reportTypeName)
         {
-            var sb = new StringBuilder();
-
-            // --- PARTE 1: FILTROS E DETALHES GERAIS ---
-            sb.AppendLine("<div class='filters'>");
-            sb.AppendLine("<h4>Filtros Aplicados:</h4>");
-
-            string dateFrom = filters?.DateFrom?.ToString("dd-MM-yyyy") ?? "Todos";
-            string dateTo = filters?.DateTo?.ToString("dd-MM-yyyy") ?? "Todos";
-            sb.AppendLine($"<p>Período: <strong>{dateFrom}</strong> a <strong>{dateTo}</strong></p>");
-
-            if (type == ReportTypesEnum.DeliveryHeaders)
+            container.Background(PrimaryGreen).Padding(30).Column(column =>
             {
-                string status = filters?.DeliveryStatus?.ToString() ?? "Todos";
-                string beneficiary = filters?.BeneficiaryId?.ToString() ?? "Todos";
-                sb.AppendLine($"<p>Status: <strong>{status}</strong> | Beneficiário ID: <strong>{beneficiary}</strong></p>");
-            }
+                column.Item().Text($"Relatório de {reportTypeName}")
+                    .Style(TextStyle.Default.FontSize(22).Bold().FontColor(Colors.White));
 
-            // Lógica de detalhes específicos (MovementDetails - Cabeçalho do movimento)
-            if (type == ReportTypesEnum.MovementDetails && data is List<VMovHistoryDetail> details && details.Any())
-            {
-                var header = details.First();
-
-                // [ALTERAÇÃO] Obter nome do tipo
-                string typeName = GetMovementTypeName(header.MovementTypeId);
-
-                sb.AppendLine("<h4>Detalhes do Movimento:</h4>");
-                // Substituído ID por Nome
-                sb.AppendLine($"<p>Tipo: <strong>{typeName}</strong> | Data: <strong>{header.MovementDate:yyyy-MM-dd HH:mm}</strong></p>");
-                sb.AppendLine($"<p>Utilizador: <strong>{header.UserName}</strong> | Nota: <strong>{header.MovementNote ?? "N/A"}</strong></p>");
-
-                if (header.DeliveryId.HasValue)
-                {
-                    sb.AppendLine($"<p>ENTREGA (Delivery ID: {header.DeliveryId})</p>");
-                }
-            }
-
-            sb.AppendLine("</div>");
-
-            // --- PARTE 2: TABELA DE DADOS ---
-
-            sb.AppendLine("<table class='report-table'>");
-            sb.AppendLine("<thead>");
-
-            if (type == ReportTypesEnum.MovementHeaders && data is List<VMovHistory> history)
-            {
-                sb.AppendLine("<tr><th>Data</th><th>Tipo</th><th>Utilizador</th><th>Nota</th><th class='align-right'>Qtd Total</th></tr>");
-                sb.AppendLine("</thead><tbody>");
-                foreach (var h in history)
-                {
-                    // [ALTERAÇÃO] Obter nome do tipo para cada linha
-                    string rowTypeName = GetMovementTypeName(h.MovementTypeId);
-
-                    sb.AppendLine($"<tr><td>{h.MovementDate:yyyy-MM-dd HH:mm}</td><td>{rowTypeName}</td><td>{h.UserName}</td><td>{h.MovementNote ?? "-"}</td><td class='align-right'>{h.TotalQuantityAffected}</td></tr>");
-                }
-            }
-            else if (type == ReportTypesEnum.DeliveryHeaders && data is List<VDelivery> deliveries)
-            {
-                sb.AppendLine("<tr><th>Data Agendada</th><th>Status</th><th>Beneficiário</th><th>Utilizador</th><th>Nota</th></tr>");
-                sb.AppendLine("</thead><tbody>");
-                foreach (var d in deliveries)
-                {
-                    // Nota: Se quiseres fazer o mesmo para StatusId, precisas de lógica similar
-                    sb.AppendLine($"<tr><td>{d.ScheduledDate:yyyy-MM-dd}</td><td>{d.StatusId}</td><td>{d.BeneficiaryName}</td><td>{d.UserName}</td><td>{d.Note ?? "-"}</td></tr>");
-                }
-            }
-            else if (type == ReportTypesEnum.MovementDetails && data is List<VMovHistoryDetail> movdetails)
-            {
-                sb.AppendLine("<tr><th>Código de Barras</th><th>Produto</th><th>Data de Validade</th><th class='align-right'>Qtd</th></tr>");
-                sb.AppendLine("</thead><tbody>");
-                foreach (var d in movdetails)
-                {
-                    sb.AppendLine($"<tr><td>{d.ProductBarcode}</td><td>{d.ProductName}</td><td>{d.GroupExpiryDate.ToString("dd-MM-yyyy")}</td><td class='align-right'>{d.ItemQuantityAffected}</td></tr>");
-                }
-            }
-
-            sb.AppendLine("</tbody></table>");
-
-            return sb.ToString();
+                column.Item().PaddingTop(8).Text($"Gerado em: {DateTime.Now:dd-MM-yyyy HH:mm}")
+                    .Style(TextStyle.Default.FontSize(10).FontColor(Colors.White));
+            });
         }
 
-        // --- MÉTODO AUXILIAR PARA IR À BD (VIA CACHE) ---
+        private void ComposeContent<T>(IContainer container, T data, ReportTypesEnum type, ReportFiltersDTO? filters)
+        {
+            container.Column(column =>
+            {
+                column.Item().Element(c => ComposeFilters(c, type, filters));
+
+                if (type == ReportTypesEnum.MovementDetails && data is List<VMovHistoryDetail> details && details.Any())
+                {
+                    column.Item().PaddingTop(15).Element(c => ComposeMovementDetailsHeader(c, details.First()));
+                }
+
+                column.Item().PaddingTop(15).Element(c => ComposeDataTable(c, data, type));
+            });
+        }
+
+        private void ComposeFilters(IContainer container, ReportTypesEnum type, ReportFiltersDTO? filters)
+        {
+            container.Background(LightGray).Padding(20).Column(column =>
+            {
+                column.Item().Text("Filtros Aplicados:")
+                    .Style(TextStyle.Default.FontSize(11).Bold().FontColor(PrimaryGreen));
+
+                column.Item().PaddingTop(10).Text(text =>
+                {
+                    string dateFrom = filters?.DateFrom?.ToString("dd-MM-yyyy") ?? "Todos";
+                    string dateTo = filters?.DateTo?.ToString("dd-MM-yyyy") ?? "Todos";
+
+                    text.Span("Período: ").FontSize(9);
+                    text.Span($"{dateFrom} a {dateTo}").Style(TextStyle.Default.FontSize(9).Bold().FontColor(PrimaryGreen));
+                });
+
+                if (type == ReportTypesEnum.DeliveryHeaders)
+                {
+                    column.Item().PaddingTop(5).Text(text =>
+                    {
+                        string status = filters?.DeliveryStatus?.ToString() ?? "Todos";
+                        string beneficiary = filters?.BeneficiaryId?.ToString() ?? "Todos";
+
+                        text.Span("Status: ").FontSize(9);
+                        text.Span(status).Style(TextStyle.Default.FontSize(9).Bold().FontColor(PrimaryGreen));
+                        text.Span(" | Beneficiário ID: ").FontSize(9);
+                        text.Span(beneficiary).Style(TextStyle.Default.FontSize(9).Bold().FontColor(PrimaryGreen));
+                    });
+                }
+            });
+        }
+
+        private void ComposeMovementDetailsHeader(IContainer container, VMovHistoryDetail header)
+        {
+            string typeName = GetMovementTypeName(header.MovementTypeId);
+
+            container.Background(LightGray).Padding(20).Column(column =>
+            {
+                column.Item().Text("Detalhes do Movimento:")
+                    .Style(TextStyle.Default.FontSize(11).Bold().FontColor(PrimaryGreen));
+
+                column.Item().PaddingTop(10).Text(text =>
+                {
+                    text.Span("Tipo: ").FontSize(9);
+                    text.Span(typeName).Style(TextStyle.Default.FontSize(9).Bold().FontColor(PrimaryGreen));
+                    text.Span(" | Data: ").FontSize(9);
+                    text.Span(header.MovementDate.ToString("yyyy-MM-dd HH:mm")).Style(TextStyle.Default.FontSize(9).Bold().FontColor(PrimaryGreen));
+                });
+
+                column.Item().PaddingTop(5).Text(text =>
+                {
+                    text.Span("Utilizador: ").FontSize(9);
+                    text.Span(header.UserName).Style(TextStyle.Default.FontSize(9).Bold().FontColor(PrimaryGreen));
+                    text.Span(" | Nota: ").FontSize(9);
+                    text.Span(header.MovementNote ?? "N/A").Style(TextStyle.Default.FontSize(9).Bold().FontColor(PrimaryGreen));
+                });
+            });
+        }
+
+        private void ComposeDataTable<T>(IContainer container, T data, ReportTypesEnum type)
+        {
+            container.Table(table =>
+            {
+                if (type == ReportTypesEnum.MovementHeaders && data is List<VMovHistory> history)
+                {
+                    table.ColumnsDefinition(columns =>
+                    {
+                        columns.RelativeColumn(2);
+                        columns.RelativeColumn(2);
+                        columns.RelativeColumn(2);
+                        columns.RelativeColumn(3);
+                        columns.RelativeColumn(1.5f);
+                    });
+
+                    table.Header(header =>
+                    {
+                        header.Cell().Element(CellStyle).Text("Data");
+                        header.Cell().Element(CellStyle).Text("Tipo");
+                        header.Cell().Element(CellStyle).Text("Utilizador");
+                        header.Cell().Element(CellStyle).Text("Nota");
+                        header.Cell().Element(CellStyle).AlignRight().Text("Qtd Total");
+
+                        static IContainer CellStyle(IContainer container) => container.Background(PrimaryGreen).Padding(12).DefaultTextStyle(x => x.SemiBold().FontColor(Colors.White).FontSize(9));
+                    });
+
+                    foreach (var h in history)
+                    {
+                        table.Cell().Element(RowStyle).Text(h.MovementDate.ToString("yyyy-MM-dd HH:mm"));
+                        table.Cell().Element(RowStyle).Text(GetMovementTypeName(h.MovementTypeId));
+                        table.Cell().Element(RowStyle).Text(h.UserName);
+                        table.Cell().Element(RowStyle).Text(h.MovementNote ?? "-");
+                        table.Cell().Element(RowStyle).AlignRight().Text(h.TotalQuantityAffected.ToString());
+                    }
+                }
+                else if (type == ReportTypesEnum.DeliveryHeaders && data is List<VDelivery> deliveries)
+                {
+                    table.ColumnsDefinition(columns =>
+                    {
+                        columns.RelativeColumn(2);
+                        columns.RelativeColumn(1.5f);
+                        columns.RelativeColumn(2.5f);
+                        columns.RelativeColumn(2);
+                        columns.RelativeColumn(3);
+                    });
+
+                    table.Header(header =>
+                    {
+                        header.Cell().Element(CellStyle).Text("Data Agendada");
+                        header.Cell().Element(CellStyle).Text("Status");
+                        header.Cell().Element(CellStyle).Text("Beneficiário");
+                        header.Cell().Element(CellStyle).Text("Utilizador");
+                        header.Cell().Element(CellStyle).Text("Nota");
+
+                        static IContainer CellStyle(IContainer container) => container.Background(PrimaryGreen).Padding(12).DefaultTextStyle(x => x.SemiBold().FontColor(Colors.White).FontSize(9));
+                    });
+
+                    foreach (var d in deliveries)
+                    {
+                        table.Cell().Element(RowStyle).Text(d.ScheduledDate.ToString("yyyy-MM-dd"));
+                        table.Cell().Element(RowStyle).Text(d.StatusId.ToString());
+                        table.Cell().Element(RowStyle).Text(d.BeneficiaryName);
+                        table.Cell().Element(RowStyle).Text(d.UserName);
+                        table.Cell().Element(RowStyle).Text(d.Note ?? "-");
+                    }
+                }
+                else if (type == ReportTypesEnum.MovementDetails && data is List<VMovHistoryDetail> details)
+                {
+                    table.ColumnsDefinition(columns =>
+                    {
+                        columns.RelativeColumn(2.5f);
+                        columns.RelativeColumn(3);
+                        columns.RelativeColumn(2);
+                        columns.RelativeColumn(1.5f);
+                    });
+
+                    table.Header(header =>
+                    {
+                        header.Cell().Element(CellStyle).Text("Código de Barras");
+                        header.Cell().Element(CellStyle).Text("Produto");
+                        header.Cell().Element(CellStyle).Text("Data de Validade");
+                        header.Cell().Element(CellStyle).AlignRight().Text("Qtd");
+
+                        static IContainer CellStyle(IContainer container) => container.Background(PrimaryGreen).Padding(12).DefaultTextStyle(x => x.SemiBold().FontColor(Colors.White).FontSize(9));
+                    });
+
+                    foreach (var d in details)
+                    {
+                        table.Cell().Element(RowStyle).Text(d.ProductBarcode);
+                        table.Cell().Element(RowStyle).Text(d.ProductName);
+                        table.Cell().Element(RowStyle).Text(d.GroupExpiryDate.ToString("dd-MM-yyyy"));
+                        table.Cell().Element(RowStyle).AlignRight().Text(d.ItemQuantityAffected.ToString());
+                    }
+                }
+
+                static IContainer RowStyle(IContainer container) => container.BorderBottom(1).BorderColor(BorderGray).Padding(10).DefaultTextStyle(x => x.FontSize(9).FontColor(DarkGray));
+            });
+        }
+
         private string GetMovementTypeName(int typeId)
         {
-            // Se a cache estiver vazia, vai à BD buscar TUDO de uma vez
             if (_movementTypesCache == null)
             {
-                try
-                {
-                    // Assume que a tabela se chama 'MovementTypes' no teu Contexto
-                    _movementTypesCache = _context.MovementTypes.ToDictionary(k => k.Id, v => v.Type);
-                }
-                catch
-                {
-                    // Fallback se houver erro de ligação (evita crash do report)
-                    _movementTypesCache = new Dictionary<int, string>();
-                }
+                try { _movementTypesCache = _context.MovementTypes.ToDictionary(k => k.Id, v => v.Type); }
+                catch { _movementTypesCache = new Dictionary<int, string>(); }
             }
-
-            // Tenta obter o nome. Se não existir o ID, devolve o número como string
             return _movementTypesCache.ContainsKey(typeId) ? _movementTypesCache[typeId] : typeId.ToString();
         }
     }

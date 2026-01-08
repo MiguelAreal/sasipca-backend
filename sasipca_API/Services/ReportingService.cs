@@ -3,33 +3,22 @@ using sasipca_API.DBModels;
 using sasipca_API.Dtos;
 using sasipca_API.Services.Interfaces;
 using System.Text;
-using WkHtmlToPdfDotNet;
-using WkHtmlToPdfDotNet.Contracts;
 using static sasipca_API.Dtos.ReportRequestDTO;
 using static sasipca_API.Enumerators.Enums;
 
 namespace sasipca_API.Services
 {
-    // ====================================================================
-    // SERVIÇO PRINCIPAL DE RELATÓRIOS (HTML-to-PDF e CSV)
-    // ====================================================================
     public class ReportingService : IReportingService
     {
         private readonly SasipcaContext _dbContext;
         private readonly ITemplateGeneratorService _templateGeneratorService;
-        private readonly IConverter _pdfConverter;
 
-
-        public ReportingService(SasipcaContext dbContext,ITemplateGeneratorService templateGeneratorService,IConverter pdfConverter)
+        public ReportingService(SasipcaContext dbContext, ITemplateGeneratorService templateGeneratorService)
         {
             _dbContext = dbContext;
             _templateGeneratorService = templateGeneratorService;
-            _pdfConverter = pdfConverter;
         }
 
-        // --------------------------------------------------------------------
-        // MÉTODO PRINCIPAL DA INTERFACE
-        // --------------------------------------------------------------------
         public async Task<(byte[] fileContent, string mimeType, string fileName, int newReportId)> GenerateReportAsync(ReportRequestDTO request, int creatorId)
         {
             // 1. Obter Nome do Tipo de Relatório
@@ -47,7 +36,7 @@ namespace sasipca_API.Services
                 reportTypeName = request.Type.ToString();
             }
 
-            // 2. Cache de Tipos de Movimento
+            // 2. Cache de Tipos de Movimento (para CSV)
             var movementTypesMap = await _dbContext.MovementTypes
                 .ToDictionaryAsync(k => k.Id, v => v.Type);
 
@@ -72,8 +61,8 @@ namespace sasipca_API.Services
             }
             else
             {
-                // PDF via Puppeteer (Async)
-                fileContent = await GeneratePdfContentAsync(data, (ReportTypesEnum)request.Type, request, reportTypeName);
+                // PDF via QuestPDF
+                fileContent = GeneratePdfContent(data, (ReportTypesEnum)request.Type, request, reportTypeName);
                 mimeType = "application/pdf";
             }
 
@@ -100,9 +89,6 @@ namespace sasipca_API.Services
             return (fileContent, mimeType, finalFileName, reportEntry.Id);
         }
 
-        // --------------------------------------------------------------------
-        // MÉTODOS AUXILIARES (Listagem e Download)
-        // --------------------------------------------------------------------
         public async Task<IEnumerable<ReportGetDTO>> GetGeneratedReportsMetadataAsync(int? reportTypeId = null)
         {
             var query = _dbContext.Reports.AsQueryable();
@@ -138,7 +124,7 @@ namespace sasipca_API.Services
             }
 
             var fileName = reportEntry.Name;
-            var reportsDirectory = Path.Combine(Directory.GetCurrentDirectory(),"Storage", "Reports");
+            var reportsDirectory = Path.Combine(Directory.GetCurrentDirectory(), "Storage", "Reports");
             var filePath = Path.Combine(reportsDirectory, fileName);
 
             var mimeType = fileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ? "application/pdf" : "text/csv";
@@ -152,9 +138,6 @@ namespace sasipca_API.Services
             return (fileContent, mimeType, fileName);
         }
 
-        // --------------------------------------------------------------------
-        // OBTENÇÃO DE DADOS
-        // --------------------------------------------------------------------
         private async Task<object> GetFilteredDataAsync(ReportRequestDTO request)
         {
             var filtersToUse = request.Filters ?? new ReportFiltersDTO();
@@ -214,14 +197,10 @@ namespace sasipca_API.Services
             return await query.OrderByDescending(d => d.ScheduledDate).ToListAsync();
         }
 
-        // --------------------------------------------------------------------
-        // GERAÇÃO DE CSV (ATUALIZADA)
-        // --------------------------------------------------------------------
         private byte[] GenerateCsvContent(object data, ReportTypesEnum type, Dictionary<int, string> movTypes)
         {
             var sb = new StringBuilder();
 
-            // Função auxiliar local para obter o nome do tipo
             string GetMovTypeName(int typeId) => movTypes.ContainsKey(typeId) ? movTypes[typeId] : typeId.ToString();
 
             if (type == ReportTypesEnum.MovementHeaders && data is List<VMovHistory> history)
@@ -229,13 +208,11 @@ namespace sasipca_API.Services
                 sb.AppendLine("ID Movimento;Data;Tipo;Utilizador;Nota;Quantidade Total Afetada");
                 foreach (var h in history)
                 {
-                    // [CORREÇÃO]: Usar GetMovTypeName em vez de h.MovementTypeId
                     sb.AppendLine($"{h.MovementId};{h.MovementDate:yyyy-MM-dd HH:mm};{GetMovTypeName(h.MovementTypeId)};{h.UserName};{h.MovementNote};{h.TotalQuantityAffected}");
                 }
             }
             else if (type == ReportTypesEnum.DeliveryHeaders && data is List<VDelivery> deliveries)
             {
-                // Nota: Poderia fazer o mesmo para StatusId se tivesses um dicionário de Status
                 sb.AppendLine("ID Entrega;Data Agendada;Status;Beneficiário;Utilizador;Nota");
                 foreach (var d in deliveries)
                 {
@@ -247,59 +224,16 @@ namespace sasipca_API.Services
                 sb.AppendLine("ID Movimento;Tipo;Data;Barcode;Produto;Data de Validade;Quantidade;Utilizador");
                 foreach (var d in details)
                 {
-                    // [CORREÇÃO]: Usar GetMovTypeName em vez de d.MovementTypeId
                     sb.AppendLine($"{d.MovementId};{GetMovTypeName(d.MovementTypeId)};{d.MovementDate:yyyy-MM-dd HH:mm};{d.ProductBarcode};{d.ProductName};{d.GroupExpiryDate};{d.ItemQuantityAffected};{d.UserName}");
                 }
             }
 
-            // Adiciona BOM (Byte Order Mark) para o Excel abrir o UTF-8 corretamente
             return Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
         }
 
-        // --------------------------------------------------------------------
-        // GERAÇÃO DE PDF
-        // --------------------------------------------------------------------
-        private Task<byte[]> GeneratePdfContentAsync(
-    object data,
-    ReportTypesEnum type,
-    ReportRequestDTO request,
-    string reportTypeName)
+        private byte[] GeneratePdfContent(object data, ReportTypesEnum type, ReportRequestDTO request, string reportTypeName)
         {
-            var htmlContent = _templateGeneratorService.GenerateReportHtml(
-                (dynamic)data, type, request, reportTypeName);
-
-            var doc = new HtmlToPdfDocument()
-            {
-                GlobalSettings =
-        {
-            ColorMode = ColorMode.Color,
-            Orientation = Orientation.Portrait,
-            PaperSize = PaperKind.A4,
-            Margins = new MarginSettings
-            {
-                Top = 10,
-                Bottom = 10,
-                Left = 10,
-                Right = 10
-            }
-        },
-                Objects =
-        {
-            new ObjectSettings
-            {
-                HtmlContent = htmlContent,
-                WebSettings =
-                {
-                    DefaultEncoding = "utf-8",
-                    LoadImages = true
-                }
-            }
+            return _templateGeneratorService.GenerateReportPdf((dynamic)data, type, request, reportTypeName);
         }
-            };
-
-            var pdf = _pdfConverter.Convert(doc);
-            return Task.FromResult(pdf);
-        }
-
     }
 }

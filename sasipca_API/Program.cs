@@ -25,8 +25,6 @@ using System.Text.Json;
 using System.Text.Unicode;
 using System.Threading.RateLimiting;
 using System.Transactions;
-using WkHtmlToPdfDotNet;
-using WkHtmlToPdfDotNet.Contracts;
 namespace sasipca_API
 {
     public class Program
@@ -96,7 +94,8 @@ namespace sasipca_API
             builder.Services.AddScoped<IJWTService, JWTService>();
             builder.Services.AddTransient<IEmailService, EmailService>();
             builder.Services.AddTransient<ITypesService, TypesService>();
-            builder.Services.AddSingleton<IConverter>(new SynchronizedConverter(new PdfTools()));
+            builder.Services.AddScoped<ITemplateGeneratorService, TemplateGeneratorService>();
+            builder.Services.AddScoped<IReportingService, ReportingService>();
 
 
             //Adicionar Serviço de WebSocket
