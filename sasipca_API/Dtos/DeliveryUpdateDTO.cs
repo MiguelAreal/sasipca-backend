@@ -26,7 +26,6 @@ namespace sasipca_API.Dtos
         /// <summary>
         /// A lista COMPLETA de produtos/lotes a serem entregues
         /// </summary>
-        [Required(ErrorMessage = "A lista de Itens é obrigatória para atualização, mesmo que vazia.")]
-        public List<DeliveryItemDTO> ItemsToDeliver { get; set; } = new List<DeliveryItemDTO>();
+        public List<DeliveryItemDTO>? ItemsToDeliver { get; set; }
     }
 }
