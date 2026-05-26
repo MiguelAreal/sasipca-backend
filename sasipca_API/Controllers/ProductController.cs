@@ -77,8 +77,14 @@ namespace sasipca_API.Controllers
 
                 // Consulta à view
                 var query = _dbContext.VStockPerProducts.AsQueryable();
-                if (!string.IsNullOrEmpty(searchTerm))
-                    query = query.Where(p => p.Name.ToLower().Contains(searchTermLower));
+                
+                // Filtro por Nome OR Código de Barras
+                if (!string.IsNullOrWhiteSpace(searchTerm))
+                {
+                    var pattern = $"%{searchTerm}%";
+                    query = query.Where(p => EF.Functions.Like(p.Name, pattern) || 
+                                             EF.Functions.Like(p.Barcode, pattern));
+                }
 
                 // Projeção
                 var products = query
