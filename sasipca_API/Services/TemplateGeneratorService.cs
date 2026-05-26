@@ -4,6 +4,7 @@ using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using sasipca_API.DBModels;
 using sasipca_API.Dtos;
+using sasipca_API.Enumerators;
 using sasipca_API.Services.Interfaces;
 using static sasipca_API.Enumerators.Enums;
 
@@ -205,7 +206,7 @@ namespace sasipca_API.Services
                     foreach (var d in deliveries)
                     {
                         table.Cell().Element(RowStyle).Text(d.ScheduledDate.ToString("yyyy-MM-dd"));
-                        table.Cell().Element(RowStyle).Text(d.StatusId.ToString());
+                        table.Cell().Element(RowStyle).Text(((Enums.DeliveryStatus)d.StatusId).ToString());
                         table.Cell().Element(RowStyle).Text(d.BeneficiaryName);
                         table.Cell().Element(RowStyle).Text(d.UserName);
                         table.Cell().Element(RowStyle).Text(d.Note ?? "-");

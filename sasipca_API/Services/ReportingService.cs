@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using sasipca_API.DBModels;
 using sasipca_API.Dtos;
+using sasipca_API.Enumerators;
 using sasipca_API.Services.Interfaces;
 using System.Text;
 using static sasipca_API.Dtos.ReportRequestDTO;
@@ -216,7 +217,7 @@ namespace sasipca_API.Services
                 sb.AppendLine("ID Entrega;Data Agendada;Status;Beneficiário;Utilizador;Nota");
                 foreach (var d in deliveries)
                 {
-                    sb.AppendLine($"{d.DeliveryId};{d.ScheduledDate:yyyy-MM-dd};{d.StatusId};{d.BeneficiaryName};{d.UserName};{d.Note}");
+                    sb.AppendLine($"{d.DeliveryId};{d.ScheduledDate:yyyy-MM-dd};{((Enums.DeliveryStatus)d.StatusId).ToString()};{d.BeneficiaryName};{d.UserName};{d.Note}");
                 }
             }
             else if (type == ReportTypesEnum.MovementDetails && data is List<VMovHistoryDetail> details)
