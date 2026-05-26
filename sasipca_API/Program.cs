@@ -79,7 +79,6 @@ namespace sasipca_API
             builder.Services.AddScoped<ITemplateGeneratorService, TemplateGeneratorService>();
             builder.Services.AddScoped<IFileStorageService, FileStorageService>();
             builder.Services.AddScoped<IJWTService, JWTService>();
-            builder.Services.AddTransient<IEmailService, EmailService>();
             builder.Services.AddTransient<ITypesService, TypesService>();
 
             builder.Services.AddWebSockets(options => {
